@@ -1,0 +1,49 @@
+# Environnement Virtuel Python
+.venv/
+.venv_temp/
+venv/
+__pycache__/
+*.pyc
+
+
+# Fichiers Serveurs locaux
+*.DS_Store
+*.log
+
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Environnement virtuel
+venv/
+.env/
+.env.*
+
+
+# Fichiers temporaires / cachés
+.DS_Store
+Thumbs.db
+*.swp
+
+# Tests / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Fichiers générés / data locale
+
+#data/
+#data_Client/
+
+# Postgres local (si data mountée)
+
+postgres/
+
+
+# IDE / éditeurs
+
+.vscode/
+.idea/

@@ -1,0 +1,50 @@
+# ============================================================================
+# Hermes Agent - Docker Compose
+# ============================================================================
+version: "3.9"
+
+services:
+  hermes:
+    image: hermes-agent:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hermes-agent
+    restart: unless-stopped
+
+    # ── Variables d'environnement ──────────────────────────────────────────
+    environment:
+      - HERMES_HOME=/root/.hermes
+      - TZ=UTC
+    # Charger les clés API depuis le fichier .env local
+    env_file:
+      - .env
+
+    # ── Volumes persistants ────────────────────────────────────────────────
+    volumes:
+      # Données Hermes (config, sessions, logs, clés)
+      - hermes-data:/root/.hermes
+      # Optionnel : monter votre dossier projet local
+      # - ./workspace:/workspace
+
+    # ── Réseau ────────────────────────────────────────────────────────────
+    # Ports exposés si Hermes démarre un serveur web/API
+    # ports:
+    #   - "3000:3000"
+    #   - "8080:8080"
+
+    # ── Mode interactif (nécessaire pour hermes en mode CLI) ──────────────
+    stdin_open: true
+    tty: true
+
+    # ── Ressources (ajuster selon votre VPS) ──────────────────────────────
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: "2.0"
+    #       memory: 4G
+
+# ── Volumes nommés ──────────────────────────────────────────────────────────
+volumes:
+  hermes-data:
+    name: hermes-agent-data

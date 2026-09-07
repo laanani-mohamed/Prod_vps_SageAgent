@@ -1,0 +1,34 @@
+psycopg2-binary>=2.9.12
+watchdog==4.0.0
+polars>=0.20.0
+pyarrow>=14.0.0
+python-dotenv==1.2.1
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+pandas>=2.0.0
+
+# ── LangGraph & MCP ────────────────────────────────────────────────────────
+langgraph>=0.2.0
+langchain-core>=0.3.0
+mcp>=1.0.0
+langchain-mcp-adapters>=0.1.0
+langgraph-checkpoint-postgres>=2.0.0
+pydantic-settings>=2.0.0
+
+# ── Tests async ────────────────────────────────────────────────────────────
+pytest>=7.0.0
+pytest-asyncio>=0.23.0
+
+# ── Dashboard Streamlit ────────────────────────────────────────────────────
+streamlit>=1.35.0
+httpx>=0.27.0
+plotly>=5.22.0
+openpyxl>=3.1.0
+fpdf>=1.7.2
+
+# ── Sécurité & Auth ────────────────────────────────────────────────────────
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+python-multipart>=0.0.9
+slowapi>=0.1.9
+redis>=5.0.0

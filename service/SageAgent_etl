@@ -1,0 +1,42 @@
+[Unit]
+Description=Pipeline ETL Sage - Watcher & Ingestion
+# Le service attend que le r  seau et la base de donn  es soient pr  ts avant de se lancer
+After=network.target postgresql.service
+
+# Protection contre la Boucle Infinie (Crash Loop)
+# Si le script crashe 5 fois en moins de 60 secondes, Systemd abandonne et d  clare le service FAILED.
+StartLimitBurst=5
+StartLimitIntervalSec=60
+
+[Service]
+# L'utilisateur Linux qui ex  cute le script (ex: amohamed)
+User=amohamed
+Group=amohamed
+
+# Le dossier racine de ton projet (absolu)
+WorkingDirectory=/opt/SageAgent
+
+# On lance le main.py avec le Python de l'environnement virtuel (.venv)
+# ATTENTION : Utilisez des chemins absolus commen  ant par /
+ExecStart=/opt/SageAgent/app/.venv/bin/python /opt/SageAgent/app/src/etl/orchestration/main.py
+
+# En cas de crash (erreur Python, perte DB), Systemd le red  marre dans 5 secondes !
+Restart=always
+RestartSec=20
+
+# Emp  che Python de retenir les logs en m  moire (utile pour le journalctl)
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
+
+
+-------------
+# Activer les services au démarrage du serveur
+sudo systemctl enable SageAgent_etl.service
+
+# Démarrer les services immédiatement
+sudo systemctl start SageAgent_etl.service
+
+# Vérifier le statut
+sudo systemctl status SageAgent_etl.service

@@ -1,0 +1,4 @@
+﻿1	AZROUKI	AYMAN	Commercial 2	1	0				
+2	ABOUZOUR	KAWTAR	Commercial 2	1	0				
+3	Directeur Commercial			1	0				
+4	Commercial 3			1	0				

@@ -1,0 +1,38 @@
+[Unit]
+Description=Dashboard BI Sage - Streamlit App
+After=network.target
+
+# Protection contre la Boucle Infinie (Crash Loop)
+StartLimitBurst=5
+StartLimitIntervalSec=60
+
+[Service]
+User=amohamed
+Group=amohamed
+
+# Il est crucial de se placer dans le dossier du dashboard pour que Streamlit trouve le dossier "pages/" et "components/"
+WorkingDirectory=/opt/SageAgent/app/src/dashboard_bi
+
+# Lancement de Streamlit via le module Python de votre environnement virtuel
+ExecStart=/opt/SageAgent/app/.venv/bin/python -m streamlit run app.py --server.port 8505 --server.address 0.0.0.0
+
+# Redémarrage automatique en cas de crash
+Restart=always
+RestartSec=20
+
+# Empêche Python de retenir les logs en mémoire
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
+
+
+-------------
+# Activer les services au démarrage du serveur
+sudo systemctl enable SageAgent_dashbi.service
+
+# Démarrer les services immédiatement
+sudo systemctl start SageAgent_dashbi.service
+
+# Vérifier le statut
+sudo systemctl status SageAgent_dashbi.service
