@@ -93,6 +93,25 @@ def fetch_balance_client():
         st.error(f"Erreur de connexion API BI : {e}")
         return []
 
+@st.cache_data(ttl=600, show_spinner=False)
+def fetch_valeur_stock():
+    """Récupère la valeur du stock par dépôt/famille/article."""
+    if not token:
+        return []
+    payload = {
+        "client_schema": client_schema,
+        "source_type": "db_latest"
+    }
+    try:
+        r = httpx.post(f"{API_BASE_URL}/api/bi/rapport/valeur-stock", json=payload, headers=headers, timeout=30.0)
+        if r.status_code == 200:
+            return r.json().get("data", [])
+        st.error(f"Erreur API BI ({r.status_code}) : {r.text}")
+        return []
+    except Exception as e:
+        st.error(f"Erreur de connexion API BI : {e}")
+        return []
+
 # ---------------------------------------------------------------------------
 # Onglets
 # ---------------------------------------------------------------------------
@@ -100,7 +119,7 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
     "1. Chiffre d'Affaire",
     "2. Comparaison CA",
     "3. Balance",
-    "4. Articles Proche Péremption",
+    "4. Valeur du Stock",
     "5. Avant Visite Client",
     "6. Produits Dormants",
     "7. Lots en Péremption",
@@ -440,64 +459,97 @@ with tab3:
         st.dataframe(df_t3.style.format(format_dict))
 
 # ---------------------------------------------------------------------------
-# Tab 4 : Articles Proche Péremption
+# Tab 4 : Valeur du Stock
 # ---------------------------------------------------------------------------
 with tab4:
-    st.subheader("Articles Proche Péremption")
-    expiry_days = st.number_input("Nombre de jours avant péremption", min_value=1, max_value=365, value=30, step=1)
-    
-    col_btn1, col_btn2, col_btn3 = st.columns([2, 1, 1])
-    with col_btn1:
-        exp_clicked = st.button("Afficher les articles", type="primary", key="btn_expiry")
-        
-    if exp_clicked:
-        with st.spinner("Recherche des articles..."):
-            data = fetch_stock_insights(expiry_days)
-            if data:
-                df = pd.DataFrame(data)
-                
-                if 'ls_no' not in df.columns:
-                    df['ls_no'] = "Aucun"
-                else:
-                    df['ls_no'] = df['ls_no'].fillna("Aucun").replace({"": "Aucun"})
-                
-                display_cols = {
-                    "ar_ref": "Réf. Article",
-                    "ar_design": "Désignation",
-                    "ls_no": "N° Lot/Série",
-                    "ls_peremption": "Date Péremption",
-                    "jours_restants": "Jours Restants",
-                    "ls_qte": "Qté Dépôt" 
-                }
-                
-                available_cols = {k: v for k, v in display_cols.items() if k in df.columns}
-                df_show = df[list(available_cols.keys())].rename(columns=available_cols)
-                
-                st.session_state['df_tab4'] = df_show
-            else:
-                st.session_state['df_tab4'] = pd.DataFrame()
-                st.info(f"Aucun article trouvé expirant dans les {expiry_days} jours.")
+    st.subheader("Valeur du Stock")
 
-    df_t4 = st.session_state.get('df_tab4')
-    if df_t4 is not None and not df_t4.empty:
-        with col_btn2:
+    col_vue, col_filtre = st.columns([1, 2])
+    with col_vue:
+        vue_option = st.selectbox(
+            "Vue",
+            options=["Par Dépôt", "Par Famille", "Par Article"],
+            key="valstock_vue",
+        )
+
+    col_btn_gen, _ = st.columns([1, 3])
+    with col_btn_gen:
+        valstock_clicked = st.button("Générer", type="primary", key="btn_valstock")
+
+    if valstock_clicked:
+        with st.spinner("Chargement de la valeur du stock..."):
+            raw = fetch_valeur_stock()
+        st.session_state["valstock_raw"] = raw
+
+    raw = st.session_state.get("valstock_raw")
+    if raw:
+        df_raw = pd.DataFrame(raw)
+        # Nettoyage numérique
+        for c in ["qte_stock", "prix_revient", "valeur_stock"]:
+            if c in df_raw.columns:
+                df_raw[c] = pd.to_numeric(df_raw[c], errors="coerce").fillna(0.0)
+
+        # Filtre contextuel
+        with col_filtre:
+            if vue_option == "Par Dépôt":
+                depots = sorted(df_raw["de_intitule"].dropna().unique().tolist())
+                filtre_val = st.selectbox("Filtrer par dépôt", options=["Tous"] + depots, key="valstock_filtre_depot")
+                if filtre_val != "Tous":
+                    df_raw = df_raw[df_raw["de_intitule"] == filtre_val]
+            elif vue_option == "Par Famille":
+                familles = sorted(df_raw["fa_intitule"].dropna().unique().tolist())
+                filtre_val = st.selectbox("Filtrer par famille", options=["Tous"] + familles, key="valstock_filtre_famille")
+                if filtre_val != "Tous":
+                    df_raw = df_raw[df_raw["fa_intitule"] == filtre_val]
+            else:
+                articles = sorted(df_raw["ar_design"].dropna().unique().tolist())
+                filtre_val = st.selectbox("Filtrer par article", options=["Tous"] + articles, key="valstock_filtre_article")
+                if filtre_val != "Tous":
+                    df_raw = df_raw[df_raw["ar_design"] == filtre_val]
+
+        # Agrégation selon la vue choisie
+        if vue_option == "Par Dépôt":
+            df_show = df_raw.groupby("de_intitule", as_index=False).agg(
+                {"qte_stock": "sum", "valeur_stock": "sum"}
+            ).rename(columns={"de_intitule": "Dépôt", "qte_stock": "Qté Stock", "valeur_stock": "Valeur Stock"})
+            df_show = df_show.sort_values("Valeur Stock", ascending=False)
+        elif vue_option == "Par Famille":
+            df_show = df_raw.groupby(["fa_intitule"], as_index=False).agg(
+                {"qte_stock": "sum", "valeur_stock": "sum"}
+            ).rename(columns={"fa_intitule": "Famille", "qte_stock": "Qté Stock", "valeur_stock": "Valeur Stock"})
+            df_show = df_show.sort_values("Valeur Stock", ascending=False)
+        else:
+            df_show = df_raw[["de_intitule", "fa_intitule", "ar_ref", "ar_design", "qte_stock", "prix_revient", "valeur_stock"]].copy()
+            df_show = df_show.rename(columns={
+                "de_intitule": "Dépôt", "fa_intitule": "Famille",
+                "ar_ref": "Réf. Article", "ar_design": "Désignation",
+                "qte_stock": "Qté Stock", "prix_revient": "Prix Revient", "valeur_stock": "Valeur Stock",
+            })
+            df_show = df_show.sort_values("Valeur Stock", ascending=False)
+
+        # Total
+        total_valeur = df_show["Valeur Stock"].sum()
+        st.metric("Valeur Totale du Stock", f"{total_valeur:,.2f} DA")
+
+        st.dataframe(df_show, use_container_width=True)
+
+        col_xl, col_pdf = st.columns(2)
+        with col_xl:
             st.download_button(
-                label="Télécharger Excel",
-                data=export_df_to_excel(df_t4),
-                file_name=f"Articles_Peremption_{expiry_days}j.xlsx",
+                label="📥 Télécharger Excel",
+                data=export_df_to_excel(df_show),
+                file_name=f"Valeur_Stock_{vue_option.replace(' ', '_')}_{date.today().isoformat()}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 type="primary",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
-        with col_btn3:
+        with col_pdf:
             st.download_button(
-                label="Télécharger PDF",
-                data=export_df_to_pdf(df_t4, title=f"Articles périmant dans les {expiry_days} jours"),
-                file_name=f"Articles_Peremption.pdf",
+                label="📄 Télécharger PDF",
+                data=export_df_to_pdf(df_show, title=f"Valeur du Stock — {vue_option}"),
+                file_name=f"Valeur_Stock_{vue_option.replace(' ', '_')}_{date.today().isoformat()}.pdf",
+                mime="application/pdf",
                 type="primary",
-                mime="application/pdf"
             )
-            
-        st.dataframe(df_t4)
 
 # ---------------------------------------------------------------------------
 # Tab 5 : Rapport Client Avant Visite

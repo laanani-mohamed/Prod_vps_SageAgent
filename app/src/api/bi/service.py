@@ -15,7 +15,7 @@ from api.bi.schemas import (
     ObjectifsResponse,
     RapportCARequest, TopClientsRequest, TopArticlesRequest,
     RapportResponse, KpiAnalytiqueResponse,
-    RapportVisiteClientRequest,
+    RapportVisiteClientRequest, ValeurStockRequest,
 )
 from api.bi.use_cases import (
     dashboard_uc,
@@ -26,6 +26,7 @@ from api.bi.use_cases import (
     top_articles_uc,
     balance_uc,
     rapport_visite_uc,
+    valeur_stock_uc,
 )
 
 logger = logging.getLogger("api.bi.service")
@@ -77,3 +78,9 @@ def get_rapport_visite(req: RapportVisiteClientRequest) -> RapportResponse:
     """Rapport Client Avant Visite (7 sections)."""
     logger.info("[BI] rapport/visite-client | schema=%s | tiers=%s", req.client_schema, req.do_tiers)
     return rapport_visite_uc.execute(req)
+
+
+def get_valeur_stock(req: ValeurStockRequest) -> RapportResponse:
+    """Rapport Valeur du Stock (DL_CMUP × qté f_artstock)."""
+    logger.info("[BI] rapport/valeur-stock | schema=%s", req.client_schema)
+    return valeur_stock_uc.execute(req)

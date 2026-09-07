@@ -19,6 +19,7 @@ from api.bi.repositories.pg_repo.bi_analytique_repo import PgBIAnalytiqueReposit
 from api.bi.repositories.pg_repo.bi_rapport_ca_repo import PgBIRapportCARepository
 from api.bi.repositories.pg_repo.bi_top_clients_repo import PgBITopClientsRepository
 from api.bi.repositories.pg_repo.bi_top_articles_repo import PgBITopArticlesRepository
+from api.bi.repositories.pg_repo.bi_valeur_stock_repo import PgBIValeurStockRepository
 
 # ── Imports Archive ───────────────────────────────────────────────────────────
 from api.bi.repositories.archive_repo.bi_dashboard_archive import ArchiveBIDashboardRepository
@@ -48,6 +49,9 @@ RESOURCE_MAP = {
     "top_articles": {
         "db_latest": PgBITopArticlesRepository,
         "archive":   ArchiveBITopArticlesRepository,
+    },
+    "valeur_stock": {
+        "db_latest": PgBIValeurStockRepository,
     },
 }
 

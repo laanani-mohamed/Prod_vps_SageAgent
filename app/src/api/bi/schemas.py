@@ -97,6 +97,11 @@ class RapportVisiteClientRequest(BaseBIRequest):
     date_to:   Optional[str] = Field(None, description="Date fin (YYYY-MM-DD) — défaut : aujourd'hui")
 
 
+class ValeurStockRequest(BaseBIRequest):
+    """Rapport Valeur du Stock (DL_CMUP × qté f_artstock)."""
+    pass
+
+
 class TopClientsRequest(BaseBIRequest):
     date_from: Optional[str] = None
     date_to: Optional[str] = None

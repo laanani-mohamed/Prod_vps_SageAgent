@@ -19,12 +19,12 @@ from api.bi.schemas import (
     DashboardRequest, DashboardResponse, ObjectifsResponse,
     RapportCARequest, TopClientsRequest, TopArticlesRequest,
     RapportResponse, KpiAnalytiqueResponse, BalanceClientRequest,
-    RapportVisiteClientRequest,
+    RapportVisiteClientRequest, ValeurStockRequest,
 )
 from api.bi.service import (
     get_dashboard, get_objectifs, get_analytique,
     get_rapport_ca, get_top_clients, get_top_articles,
-    get_balance_client, get_rapport_visite,
+    get_balance_client, get_rapport_visite, get_valeur_stock,
 )
 
 logger = logging.getLogger("api.bi.router")
@@ -200,6 +200,26 @@ def rapport_visite_client(
     return secured_handle(
         get_rapport_visite,
         endpoint="/api/bi/rapport/visite-client",
+        request=request,
+        current_user=current_user,
+        client_schema=req.client_schema,
+        req=req
+    )
+
+
+@router.post(
+    "/rapport/valeur-stock",
+    response_model=RapportResponse,
+    summary="Rapport Valeur du Stock (DL_CMUP × qté par dépôt/famille/article)",
+)
+def rapport_valeur_stock(
+    req: ValeurStockRequest,
+    request: Request,
+    current_user: TokenData = Depends(require_role("analyst"))
+) -> RapportResponse:
+    return secured_handle(
+        get_valeur_stock,
+        endpoint="/api/bi/rapport/valeur-stock",
         request=request,
         current_user=current_user,
         client_schema=req.client_schema,
