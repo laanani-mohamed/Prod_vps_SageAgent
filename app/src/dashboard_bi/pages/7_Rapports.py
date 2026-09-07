@@ -484,29 +484,76 @@ with tab4:
     raw = st.session_state.get("valstock_raw")
     if raw:
         df_raw = pd.DataFrame(raw)
+
+        def fmt_space(value):
+            if pd.isna(value):
+                return ""
+            return f"{float(value):,.2f}".replace(",", " ").replace(".", ",")
+
         # Nettoyage numérique
         for c in ["qte_stock", "prix_revient", "valeur_stock"]:
             if c in df_raw.columns:
                 df_raw[c] = pd.to_numeric(df_raw[c], errors="coerce").fillna(0.0)
-
-        # Filtre contextuel
+                # Filtre contextuel — style Fichier de Base / Articles
         with col_filtre:
             if vue_option == "Par Dépôt":
                 depots = sorted(df_raw["de_intitule"].dropna().unique().tolist())
-                filtre_val = st.selectbox("Filtrer par dépôt", options=["Tous"] + depots, key="valstock_filtre_depot")
-                if filtre_val != "Tous":
-                    df_raw = df_raw[df_raw["de_intitule"] == filtre_val]
+                depots_sel = st.multiselect(
+                    "📦 Dépôt",
+                    options=depots,
+                    default=depots,
+                    key="valstock_filtre_depot",
+                )
+                if depots_sel:
+                    df_raw = df_raw[df_raw["de_intitule"].isin(depots_sel)]
+
             elif vue_option == "Par Famille":
                 familles = sorted(df_raw["fa_intitule"].dropna().unique().tolist())
-                filtre_val = st.selectbox("Filtrer par famille", options=["Tous"] + familles, key="valstock_filtre_famille")
-                if filtre_val != "Tous":
-                    df_raw = df_raw[df_raw["fa_intitule"] == filtre_val]
-            else:
-                articles = sorted(df_raw["ar_design"].dropna().unique().tolist())
-                filtre_val = st.selectbox("Filtrer par article", options=["Tous"] + articles, key="valstock_filtre_article")
-                if filtre_val != "Tous":
-                    df_raw = df_raw[df_raw["ar_design"] == filtre_val]
+                familles_sel = st.multiselect(
+                    "📁 Famille",
+                    options=familles,
+                    default=familles,
+                    key="valstock_filtre_famille",
+                )
+                if familles_sel:
+                    df_raw = df_raw[df_raw["fa_intitule"].isin(familles_sel)]
 
+            else:
+                articles_design = sorted(df_raw["ar_design"].dropna().unique().tolist())
+                articles_ref = sorted(df_raw["ar_ref"].dropna().astype(str).unique().tolist())
+                fams = sorted(df_raw["fa_intitule"].dropna().unique().tolist())
+
+                col_filtre_a, col_filtre_b, col_filtre_c = st.columns([1.2, 1.2, 1.2])
+
+                with col_filtre_a:
+                    art_design_sel = st.selectbox(
+                        "🔍 Désignation",
+                        options=["Tout"] + articles_design,
+                        index=0,
+                        key="valstock_filtre_design",
+                    )
+                with col_filtre_b:
+                    art_ref_sel = st.selectbox(
+                        "🔍 Référence",
+                        options=["Tout"] + articles_ref,
+                        index=0,
+                        key="valstock_filtre_ref",
+                    )
+                with col_filtre_c:
+                    fam_sel = st.multiselect(
+                        "📁 Famille",
+                        options=fams,
+                        default=fams,
+                        key="valstock_filtre_article_fam",
+                    )
+
+                if art_design_sel != "Tout":
+                    df_raw = df_raw[df_raw["ar_design"].astype(str) == str(art_design_sel)]
+                if art_ref_sel != "Tout":
+                    df_raw = df_raw[df_raw["ar_ref"].astype(str) == str(art_ref_sel)]
+                if fam_sel:
+                    df_raw = df_raw[df_raw["fa_intitule"].isin(fam_sel)]
+    
         # Agrégation selon la vue choisie
         if vue_option == "Par Dépôt":
             df_show = df_raw.groupby("de_intitule", as_index=False).agg(
@@ -523,15 +570,24 @@ with tab4:
             df_show = df_show.rename(columns={
                 "de_intitule": "Dépôt", "fa_intitule": "Famille",
                 "ar_ref": "Réf. Article", "ar_design": "Désignation",
-                "qte_stock": "Qté Stock", "prix_revient": "Prix Revient", "valeur_stock": "Valeur Stock",
+                "qte_stock": "Qté Stock", "prix_revient": "Coût moyen achat", "valeur_stock": "Valeur Stock",
             })
             df_show = df_show.sort_values("Valeur Stock", ascending=False)
 
         # Total
         total_valeur = df_show["Valeur Stock"].sum()
-        st.metric("Valeur Totale du Stock", f"{total_valeur:,.2f} DA")
+        st.metric("Valeur Totale du Stock", f"{fmt_space(total_valeur)} MAD")
 
-        st.dataframe(df_show, use_container_width=True)
+        num_cols = [c for c in df_show.columns if c in ["Qté Stock", "Valeur Stock", "Coût moyen achat"]]
+        format_dict = {col: fmt_space for col in num_cols}
+        st.dataframe(df_show.style.format(format_dict), use_container_width=True)
+
+        if vue_option == "Par Dépôt":
+            pdf_subtitle = "Filtre par dépôt"
+        elif vue_option == "Par Famille":
+            pdf_subtitle = "Filtre par famille"
+        else:
+            pdf_subtitle = "Filtre par dépôt, filtre par famille, filtre par articles"
 
         col_xl, col_pdf = st.columns(2)
         with col_xl:
@@ -545,7 +601,7 @@ with tab4:
         with col_pdf:
             st.download_button(
                 label="📄 Télécharger PDF",
-                data=export_df_to_pdf(df_show, title=f"Valeur du Stock — {vue_option}"),
+                data=export_df_to_pdf(df_show, title="Valeur du Stock", subtitle=pdf_subtitle),
                 file_name=f"Valeur_Stock_{vue_option.replace(' ', '_')}_{date.today().isoformat()}.pdf",
                 mime="application/pdf",
                 type="primary",

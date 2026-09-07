@@ -31,30 +31,37 @@ def export_df_to_excel(df: pd.DataFrame) -> bytes:
     return processed_data
 
 
+def _safe_pdf_text(value) -> str:
+    """Convertit une valeur en texte PDF propre et sans caractères parasites."""
+    text = "" if value is None else str(value)
+    return text.replace("?", "").replace("\n", " ").strip()
+
+
 def export_df_to_pdf(df: pd.DataFrame, title: str, subtitle: str = "") -> bytes:
     """Export a DataFrame to a simple PDF table with numeric values at 2 decimal places."""
     pdf = FPDF(orientation='L', unit='mm', format='A4')
     pdf.add_page()
-    
+
+    clean_title = _safe_pdf_text(title) or "Rapport"
+    clean_subtitle = _safe_pdf_text(subtitle)
+
     pdf.set_font("Arial", style='B', size=16)
-    pdf.cell(200, 10, txt=title.encode('latin-1', 'replace').decode('latin-1'), ln=True, align='C')
+    pdf.cell(0, 10, txt=clean_title.encode('latin-1', 'replace').decode('latin-1'), ln=True, align='C')
+    pdf.ln(2)
+
+    if clean_subtitle:
+        pdf.set_font("Arial", style='I', size=11)
+        pdf.cell(0, 8, txt=clean_subtitle.encode('latin-1', 'replace').decode('latin-1'), ln=True, align='C')
+        pdf.ln(2)
+
+    pdf.set_font("Arial", size=9)
+    pdf.cell(0, 8, txt=f"Genere le: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", ln=True, align='L')
     pdf.ln(4)
-    
-    if subtitle:
-        pdf.set_font("Arial", style='I', size=12)
-        pdf.cell(200, 8, txt=subtitle.encode('latin-1', 'replace').decode('latin-1'), ln=True, align='C')
-        pdf.ln(4)
-    
-    pdf.set_font("Arial", size=10)
-    date_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    pdf.cell(200, 10, txt=f"Genere le: {date_str}", ln=True, align='L')
-    pdf.ln(5)
-    
+
     if not df.empty:
         col_names = df.columns.tolist()
         page_width = pdf.w - 2 * pdf.l_margin
-        
-        # Calculate proportional column widths
+
         col_max_lens = []
         for col in col_names:
             max_len = len(str(col))
@@ -67,24 +74,22 @@ def export_df_to_pdf(df: pd.DataFrame, title: str, subtitle: str = "") -> bytes:
                     item_str = str(item)
                 max_len = max(max_len, len(item_str))
             col_max_lens.append(max_len)
-            
-        total_len = sum(col_max_lens)
-        # Allocate width proportionally, ensuring a small minimum width
+
+        total_len = sum(col_max_lens) or 1
         col_widths = [max((w / total_len) * page_width, 10.0) for w in col_max_lens]
-        
-        # Re-adjust to fit exactly page_width if minimums pushed it over
         current_total = sum(col_widths)
         col_widths = [(w / current_total) * page_width for w in col_widths]
-        
-        # Header
-        pdf.set_font("Arial", style='B', size=9)
+
+        pdf.set_fill_color(41, 128, 185)
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font("Arial", style='B', size=8)
         for col, width in zip(col_names, col_widths):
             header_text = str(col).encode('latin-1', 'replace').decode('latin-1')[:40]
-            pdf.cell(width, 10, header_text, border=1, align='C')
+            pdf.cell(width, 8, header_text, border=1, align='C', fill=True)
         pdf.ln()
-        
-        # Data
-        pdf.set_font("Arial", size=8)
+        pdf.set_text_color(0, 0, 0)
+
+        pdf.set_font("Arial", size=7)
         for _, row in df.iterrows():
             for col_name, width, item in zip(col_names, col_widths, row):
                 if isinstance(item, float):
@@ -94,16 +99,11 @@ def export_df_to_pdf(df: pd.DataFrame, title: str, subtitle: str = "") -> bytes:
                 else:
                     formatted = str(item)
                 cell_text = formatted.encode('latin-1', 'replace').decode('latin-1')[:50]
-                pdf.cell(width, 10, cell_text, border=1, align='C')
+                pdf.cell(width, 7, cell_text, border=1, align='C')
             pdf.ln()
-            
+
     pdf_string = pdf.output(dest='S').encode('latin-1', 'replace')
     return pdf_string
-
-
-def _safe(text: str) -> str:
-    """Encode to latin-1 with replacement for FPDF/Arial compatibility."""
-    return str(text).encode('latin-1', 'replace').decode('latin-1')
 
 
 def export_visite_to_pdf(sections: list, title: str, subtitle: str = "") -> bytes:
