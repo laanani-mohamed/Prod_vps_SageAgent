@@ -58,10 +58,19 @@ def detect_stock_alerts(raw_data: List[Dict[str, Any]], alert_type: str, thresho
             group_cols.append("derniere_date_vente")
         if "nbr_jours_inactif" in df.columns:
             group_cols.append("nbr_jours_inactif")
-            
-        df_agg = df.group_by(group_cols).agg([
+
+        agg_exprs = [
             pl.col("as_qtesto").cast(pl.Float64, strict=False).sum().alias("quantite_totale")
-        ])
+        ]
+        if "ar_prixach" in df.columns:
+            agg_exprs.append(pl.col("ar_prixach").cast(pl.Float64, strict=False).mean().alias("prix_achat"))
+
+        df_agg = df.group_by(group_cols).agg(agg_exprs)
+
+        if "prix_achat" in df_agg.columns:
+            df_agg = df_agg.with_columns(
+                (pl.col("quantite_totale") * pl.col("prix_achat")).alias("valeur_stock")
+            )
 
         if alert_type == "stock_bas":
             df_agg = df_agg.filter((pl.col("quantite_totale") > 0) & (pl.col("quantite_totale") <= threshold))

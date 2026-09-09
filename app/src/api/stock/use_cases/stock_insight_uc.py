@@ -32,7 +32,7 @@ def execute(req: StockInsightRequest) -> StockResponse:
         if insight_type == "rupture":
             out_cols = ["ar_ref", "ar_design", "fa_intitule", "de_intitule", "suivi_lot", "derniere_date_vente", "nbr_jours_inactif"]
         else:
-            out_cols = ["ar_ref", "ar_design", "fa_intitule", "quantite_totale", "derniere_date_vente", "nbr_jours_inactif"]
+            out_cols = ["ar_ref", "ar_design", "fa_intitule", "quantite_totale", "prix_achat", "valeur_stock", "derniere_date_vente", "nbr_jours_inactif"]
 
     metadata = {
         "insight_type": insight_type,

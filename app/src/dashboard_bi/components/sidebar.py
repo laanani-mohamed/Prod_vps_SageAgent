@@ -8,5 +8,5 @@ def render_sidebar():
     """Rendu de la sidebar globale."""
     apply_sidebar_css()
     with st.sidebar:
-        st.title("SAGE Dashboard")
+        st.title("ITBORD")
         st.divider()

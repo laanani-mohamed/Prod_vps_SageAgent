@@ -113,7 +113,7 @@ with km1:
         st.metric(
             label="Chiffre d'Affaires (Obj)",
             value=to_m_str(ca),
-            #delta=f"{pct_ca_val}% de l'objectif 6 MMAD",
+            #delta=f"{pct_ca_val}% de l'objectif 25 MMAD",
             #delta_color="inverse",
             help=f"CA HT des ventes cumulé depuis le début de l'année ({ytd_label}).",
         )
@@ -125,7 +125,7 @@ with km1:
                 margin-top: -10px; 
                 font-family: inherit;
             ">
-                {pct_ca_val}% de l'objectif 6 MMAD
+                {pct_ca_val}% de l'objectif 25 MMAD
             </div>
             """
         )

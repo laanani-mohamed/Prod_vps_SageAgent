@@ -117,12 +117,12 @@ def export_visite_to_pdf(sections: list, title: str, subtitle: str = "") -> byte
 
     # Main title
     pdf.set_font("Arial", style='B', size=16)
-    pdf.cell(0, 10, txt=_safe(title), ln=True, align='C')
+    pdf.cell(0, 10, txt=_safe_pdf_text(title).encode('latin-1', 'replace').decode('latin-1'), ln=True, align='C')
     pdf.ln(2)
 
     if subtitle:
         pdf.set_font("Arial", style='I', size=11)
-        pdf.cell(0, 8, txt=_safe(subtitle), ln=True, align='C')
+        pdf.cell(0, 8, txt=_safe_pdf_text(subtitle).encode('latin-1', 'replace').decode('latin-1'), ln=True, align='C')
         pdf.ln(2)
 
     pdf.set_font("Arial", size=9)
@@ -140,7 +140,7 @@ def export_visite_to_pdf(sections: list, title: str, subtitle: str = "") -> byte
         pdf.set_fill_color(41, 128, 185)  # blue
         pdf.set_text_color(255, 255, 255)
         pdf.set_font("Arial", style='B', size=11)
-        pdf.cell(page_width, 9, txt=_safe(section_title), border=0, ln=True, align='L', fill=True)
+        pdf.cell(page_width, 9, txt=_safe_pdf_text(section_title).encode('latin-1', 'replace').decode('latin-1'), border=0, ln=True, align='L', fill=True)
         pdf.set_text_color(0, 0, 0)
         pdf.ln(2)
 
@@ -175,7 +175,7 @@ def export_visite_to_pdf(sections: list, title: str, subtitle: str = "") -> byte
         pdf.set_font("Arial", style='B', size=8)
         pdf.set_fill_color(220, 220, 220)
         for col, width in zip(col_names, col_widths):
-            pdf.cell(width, 8, _safe(str(col))[:40], border=1, align='C', fill=True)
+            pdf.cell(width, 8, _safe_pdf_text(str(col))[:40].encode('latin-1', 'replace').decode('latin-1'), border=1, align='C', fill=True)
         pdf.ln()
 
         # Data rows
@@ -188,7 +188,7 @@ def export_visite_to_pdf(sections: list, title: str, subtitle: str = "") -> byte
                 pdf.set_font("Arial", style='B', size=8)
                 pdf.set_fill_color(220, 220, 220)
                 for col, width in zip(col_names, col_widths):
-                    pdf.cell(width, 8, _safe(str(col))[:40], border=1, align='C', fill=True)
+                    pdf.cell(width, 8, _safe_pdf_text(str(col))[:40].encode('latin-1', 'replace').decode('latin-1'), border=1, align='C', fill=True)
                 pdf.ln()
                 pdf.set_font("Arial", size=7)
 
@@ -199,7 +199,7 @@ def export_visite_to_pdf(sections: list, title: str, subtitle: str = "") -> byte
                     formatted = f"{item:,.2f}"
                 else:
                     formatted = str(item)
-                pdf.cell(width, 7, _safe(formatted)[:50], border=1, align='C')
+                pdf.cell(width, 7, _safe_pdf_text(formatted)[:50].encode('latin-1', 'replace').decode('latin-1'), border=1, align='C')
             pdf.ln()
 
         pdf.ln(6)
