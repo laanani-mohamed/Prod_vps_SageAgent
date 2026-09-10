@@ -2,6 +2,7 @@
 Dash/pages/7_Rapports.py
 Page 7 — Rapports BI
 """
+import io
 import streamlit as st
 import pandas as pd
 from datetime import date, timedelta
@@ -11,6 +12,55 @@ from components.styles_initiale import apply_custom_css
 from components.auth_guard import require_auth, handle_auth_error
 from config import API_BASE_URL, SOURCE_TYPE
 from utils.exports import export_df_to_excel, export_df_to_pdf, export_visite_to_pdf
+
+
+def render_export_buttons(df: pd.DataFrame, filename_base: str, pdf_section_title: str, pdf_title: str, pdf_subtitle: str):
+    """Bouton Excel + PDF (section unique) pour un DataFrame — colonnes fraîches côte à côte."""
+    col_xl, col_pdf = st.columns(2)
+    with col_xl:
+        st.download_button(
+            label="📥 Télécharger Excel",
+            data=export_df_to_excel(df),
+            file_name=f"{filename_base}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            type="primary",
+        )
+    with col_pdf:
+        st.download_button(
+            label="📄 Télécharger PDF",
+            data=export_visite_to_pdf([(pdf_section_title, df)], title=pdf_title, subtitle=pdf_subtitle),
+            file_name=f"{filename_base}.pdf",
+            mime="application/pdf",
+            type="primary",
+        )
+
+
+def render_multi_export_buttons(sections: list, filename_base: str, pdf_title: str, pdf_subtitle: str):
+    """Bouton Excel multi-feuilles + PDF multi-sections pour une liste de (label, DataFrame)."""
+    excel_buf = io.BytesIO()
+    with pd.ExcelWriter(excel_buf, engine="openpyxl") as writer:
+        for label, df_s in sections:
+            if df_s is not None and not df_s.empty:
+                df_s.to_excel(writer, sheet_name=label[:31], index=False)
+    excel_buf.seek(0)
+
+    col_xl, col_pdf = st.columns(2)
+    with col_xl:
+        st.download_button(
+            label="📥 Télécharger Excel",
+            data=excel_buf.getvalue(),
+            file_name=f"{filename_base}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            type="primary",
+        )
+    with col_pdf:
+        st.download_button(
+            label="📄 Télécharger PDF",
+            data=export_visite_to_pdf(sections, title=pdf_title, subtitle=pdf_subtitle),
+            file_name=f"{filename_base}.pdf",
+            mime="application/pdf",
+            type="primary",
+        )
 from services.stock_service import get_stock_insights
 from services.referentiel_service import get_comptes_tiers
 
@@ -112,10 +162,29 @@ def fetch_valeur_stock():
         st.error(f"Erreur de connexion API BI : {e}")
         return []
 
+@st.cache_data(ttl=600, show_spinner=False)
+def fetch_consommation():
+    """Récupère la consommation d'articles par famille/produit (6 mois glissants)."""
+    if not token:
+        return {}
+    payload = {
+        "client_schema": client_schema,
+        "source_type": "db_latest"
+    }
+    try:
+        r = httpx.post(f"{API_BASE_URL}/api/bi/rapport/consommation", json=payload, headers=headers, timeout=30.0)
+        if r.status_code == 200:
+            return r.json().get("data", [{}])[0]
+        st.error(f"Erreur API BI ({r.status_code}) : {r.text}")
+        return {}
+    except Exception as e:
+        st.error(f"Erreur de connexion API BI : {e}")
+        return {}
+
 # ---------------------------------------------------------------------------
 # Onglets
 # ---------------------------------------------------------------------------
-tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
     "1. Chiffre d'Affaire",
     "2. Comparaison CA",
     "3. Balance",
@@ -123,6 +192,7 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
     "5. Avant Visite Client",
     "6. Produits Dormants",
     "7. Lots en Péremption",
+    "8. Consommation par Produit",
 
 ])
 
@@ -699,9 +769,6 @@ with tab5:
         # ── Exports ─────────────────────────────────────────────────────────
         st.markdown("---")
 
-        # Concaténer tous les DFs en un seul Excel multi-feuilles
-        import io
-        from openpyxl import Workbook
         section_labels = {
             "bc_en_cours":          "1-BCs en cours",
             "factures_non_reglees": "2-Factures impayées",
@@ -711,42 +778,14 @@ with tab5:
             "familles_mortes":      "6-Familles mortes",
             "comparaison_ca":       "7-Comparaison CA",
         }
+        sections = [(label, _dfs_export.get(key, pd.DataFrame())) for key, label in section_labels.items()]
 
-        excel_buf = io.BytesIO()
-        with pd.ExcelWriter(excel_buf, engine="openpyxl") as writer:
-            for key, label in section_labels.items():
-                df_s = _dfs_export.get(key, pd.DataFrame())
-                if not df_s.empty:
-                    df_s.to_excel(writer, sheet_name=label[:31], index=False)
-        excel_buf.seek(0)
-
-
-        col_xl, col_pdf = st.columns(2)
-        with col_xl:
-            st.download_button(
-                label="📥 Télécharger Excel",
-                data=excel_buf.getvalue(),
-                file_name=f"Rapport_Visite_{visite_tiers}_{date.today().isoformat()}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                type="primary",
-            )
-        with col_pdf:
-            from utils.exports import export_visite_to_pdf
-            pdf_sections = [
-                (label, _dfs_export.get(key, pd.DataFrame()))
-                for key, label in section_labels.items()
-            ]
-            st.download_button(
-                label="📄 Télécharger PDF",
-                data=export_visite_to_pdf(
-                    pdf_sections,
-                    title=f"Rapport Avant Visite - {visite_client}",
-                    subtitle=subtitle_visite,
-                ),
-                file_name=f"Rapport_Visite_{visite_tiers}_{date.today().isoformat()}.pdf",
-                mime="application/pdf",
-                type="primary",
-            )
+        render_multi_export_buttons(
+            sections,
+            filename_base=f"Rapport_Visite_{visite_tiers}_{date.today().isoformat()}",
+            pdf_title=f"Rapport Avant Visite - {visite_client}",
+            pdf_subtitle=subtitle_visite,
+        )
 
 # ---------------------------------------------------------------------------
 # Tab 6 : Produits Dormants
@@ -814,27 +853,13 @@ with tab6:
             else:
                 st.dataframe(df_dormant, use_container_width=True)
 
-            col_xl, col_pdf = st.columns(2)
-            with col_xl:
-                st.download_button(
-                    label="📥 Télécharger Excel",
-                    data=export_df_to_excel(df_dormant),
-                    file_name=f"Dormants_{d_months}mois_{date.today().isoformat()}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    type="primary",
-                )
-            with col_pdf:
-                st.download_button(
-                    label="📄 Télécharger PDF",
-                    data=export_visite_to_pdf(
-                        [(f"Produits Dormants (inactifs > {d_months} mois)", df_dormant)],
-                        title="Rapport Produits Dormants",
-                        subtitle=f"Inactivite > {d_months} mois",
-                    ),
-                    file_name=f"Dormants_{d_months}mois_{date.today().isoformat()}.pdf",
-                    mime="application/pdf",
-                    type="primary",
-                )
+            render_export_buttons(
+                df_dormant,
+                filename_base=f"Dormants_{d_months}mois_{date.today().isoformat()}",
+                pdf_section_title=f"Produits Dormants (inactifs > {d_months} mois)",
+                pdf_title="Rapport Produits Dormants",
+                pdf_subtitle=f"Inactivite > {d_months} mois",
+            )
 
 # ---------------------------------------------------------------------------
 # Tab 7 : Lots en Péremption
@@ -880,24 +905,57 @@ with tab7:
         else:
             st.dataframe(df_perempt, use_container_width=True)
 
-            col_xl, col_pdf = st.columns(2)
-            with col_xl:
-                st.download_button(
-                    label="📥 Télécharger Excel",
-                    data=export_df_to_excel(df_perempt),
-                    file_name=f"Peremption_{e_days}j_{date.today().isoformat()}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    type="primary",
-                )
-            with col_pdf:
-                st.download_button(
-                    label="📄 Télécharger PDF",
-                    data=export_visite_to_pdf(
-                        [(f"Lots en Peremption (< {e_days} jours)", df_perempt)],
-                        title="Rapport Lots en Peremption",
-                        subtitle=f"Expiration dans les {e_days} prochains jours",
-                    ),
-                    file_name=f"Peremption_{e_days}j_{date.today().isoformat()}.pdf",
-                    mime="application/pdf",
-                    type="primary",
-                )
+            render_export_buttons(
+                df_perempt,
+                filename_base=f"Peremption_{e_days}j_{date.today().isoformat()}",
+                pdf_section_title=f"Lots en Peremption (< {e_days} jours)",
+                pdf_title="Rapport Lots en Peremption",
+                pdf_subtitle=f"Expiration dans les {e_days} prochains jours",
+            )
+
+# ---------------------------------------------------------------------------
+# Tab 8 : Consommation par Produit
+# ---------------------------------------------------------------------------
+with tab8:
+    st.subheader("Gestion de Consommation des Articles par Produits")
+
+    conso_clicked = st.button("Générer", type="primary", key="btn_consommation")
+
+    if conso_clicked:
+        with st.spinner("Chargement de la consommation..."):
+            conso_data = fetch_consommation()
+        st.session_state["conso_data"] = conso_data
+
+    conso_data = st.session_state.get("conso_data")
+    if conso_data:
+        df_famille = pd.DataFrame(conso_data.get("par_famille", []))
+        df_article = pd.DataFrame(conso_data.get("par_article", []))
+
+        st.markdown("#### Récapitulatif par Famille")
+        if df_famille.empty:
+            st.info("Aucune donnée de consommation par famille.")
+        else:
+            st.dataframe(
+                df_famille.style.format({"Qté Totale Consommée": "{:,.2f}"}),
+                use_container_width=True,
+            )
+
+        st.markdown("---")
+        st.markdown("#### Détail par Article")
+        if df_article.empty:
+            st.info("Aucune donnée de consommation par article.")
+        else:
+            month_cols = [c for c in ["Mois en cours", "M1", "M2", "M3", "M4", "M5", "M6"] if c in df_article.columns]
+            st.dataframe(
+                df_article.style.format({c: "{:,.2f}" for c in month_cols}),
+                use_container_width=True,
+            )
+
+        if not df_famille.empty or not df_article.empty:
+            st.markdown("---")
+            render_multi_export_buttons(
+                [("Recap par Famille", df_famille), ("Detail par Article", df_article)],
+                filename_base=f"Consommation_{date.today().isoformat()}",
+                pdf_title="Rapport Consommation par Produit",
+                pdf_subtitle=f"6 derniers mois — Généré le {date.today().isoformat()}",
+            )

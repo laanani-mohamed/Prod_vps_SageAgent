@@ -16,6 +16,7 @@ from api.bi.schemas import (
     RapportCARequest, TopClientsRequest, TopArticlesRequest,
     RapportResponse, KpiAnalytiqueResponse,
     RapportVisiteClientRequest, ValeurStockRequest,
+    RapportConsommationRequest,
 )
 from api.bi.use_cases import (
     dashboard_uc,
@@ -27,6 +28,7 @@ from api.bi.use_cases import (
     balance_uc,
     rapport_visite_uc,
     valeur_stock_uc,
+    consommation_uc,
 )
 
 logger = logging.getLogger("api.bi.service")
@@ -84,3 +86,9 @@ def get_valeur_stock(req: ValeurStockRequest) -> RapportResponse:
     """Rapport Valeur du Stock (DL_CMUP × qté f_artstock)."""
     logger.info("[BI] rapport/valeur-stock | schema=%s", req.client_schema)
     return valeur_stock_uc.execute(req)
+
+
+def get_rapport_consommation(req: RapportConsommationRequest) -> RapportResponse:
+    """Consommation des articles par famille/produit (6 mois glissants)."""
+    logger.info("[BI] rapport/consommation | schema=%s", req.client_schema)
+    return consommation_uc.execute(req)

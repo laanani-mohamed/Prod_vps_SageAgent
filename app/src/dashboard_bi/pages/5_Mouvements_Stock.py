@@ -8,20 +8,104 @@ import pandas as pd
 import datetime
 from components.styles_initiale import apply_custom_css
 from components.data_tables import show_df
-from components.auth_guard import require_auth
+from components.auth_guard import require_auth, handle_auth_error, require_api_health
 
 apply_custom_css()
 require_auth()
 
 from services.stock_service import get_stock_availability, get_stock_insights, get_mouvements_entrants, get_mouvements_sortants
 from services.referentiel_service import get_familles, get_depots
-from services.base import check_api_health
 
 st.header("Stock & Mouvements")
 
-if not check_api_health():
-    st.error("API injoignable.")
-    st.stop()
+require_api_health()
+
+# ---------------------------------------------------------------------------
+# Rendu commun aux onglets Mouvements Entrants / Sortants
+# ---------------------------------------------------------------------------
+_MOUVEMENT_LABELS = {
+    "entrant": {"title": "Entrants", "adj": "entrante", "empty_adj": "entrant", "key": "ent"},
+    "sortant": {"title": "Sortants", "adj": "sortante", "empty_adj": "sortant", "key": "sort"},
+}
+
+
+def render_mouvements_tab(direction: str, fetch_fn, client_schema: str, search_ref: str, limit: int):
+    labels = _MOUVEMENT_LABELS[direction]
+    key = labels["key"]
+
+    st.subheader(f"Mouvements {labels['title']}")
+
+    with st.expander("🔍 Filtres de date", expanded=True):
+        c1, c2 = st.columns(2)
+        with c1:
+            today = datetime.date.today()
+            date_from = st.date_input("Date début", value=today.replace(month=1, day=1), key=f"{key}_date_from")
+        with c2:
+            date_to = st.date_input("Date fin", value=today, key=f"{key}_date_to")
+        st.button("▶ Appliquer", type="primary", use_container_width=True, key=f"btn_{key}")
+
+    with st.spinner(f"Chargement des mouvements {labels['title'].lower()}..."):
+        df_mvt = fetch_fn(
+            client_schema=client_schema,
+            ar_ref=search_ref,
+            date_from=str(date_from),
+            date_to=str(date_to),
+            limit=limit,
+        )
+
+    if df_mvt.empty:
+        st.info(f"Aucun document {labels['empty_adj']} trouvé pour les filtres sélectionnés.")
+        return
+
+    total_val = df_mvt["Montant HT"].sum() if "Montant HT" in df_mvt.columns else 0
+
+    k1, k2 = st.columns(2)
+    k1.metric("Nombre de documents", f"{len(df_mvt):,}")
+    k2.metric(f"Valeur HT {labels['adj']}", f"{total_val:,.2f} DH")
+    st.divider()
+
+    types = ["Tous"] + sorted(df_mvt["Type"].unique().tolist()) if "Type" in df_mvt.columns else ["Tous"]
+    sel_type = st.selectbox("Filtrer par type", types, key=f"sel_type_{key}")
+    df_mvt_show = df_mvt if sel_type == "Tous" else df_mvt[df_mvt["Type"] == sel_type]
+
+    st.markdown(f"*{len(df_mvt_show):,} document(s) affiché(s)*")
+    selection = show_df(
+        df_mvt_show.reset_index(drop=True),
+        on_select="rerun",
+        selection_mode="single-row",
+        key_suffix=f"stock_{key}"
+    )
+
+    sel_rows = selection.get("selection", {}).get("rows", [])
+    if not sel_rows:
+        return
+
+    row = df_mvt_show.reset_index(drop=True).iloc[sel_rows[0]]
+    piece_no = row.get("N° Pièce", "-")
+    st.divider()
+    st.subheader(f"🔍 Lignes du document : {piece_no}")
+
+    if piece_no and piece_no != "-":
+        with st.spinner("Chargement des lignes..."):
+            from services.documents_service import get_documents_ligne
+            filters_l = {}
+            if search_ref:
+                filters_l["ar_ref"] = [search_ref]
+            lignes = get_documents_ligne(client_schema, do_piece=piece_no, filters=filters_l)
+
+        if lignes:
+            df_l = pd.DataFrame(lignes)
+            cols_l = {
+                "ar_ref": "Réf. Article",
+                "dl_design": "Désignation",
+                "dl_qte": "Qté",
+                "dl_prixunitaire": "PU HT",
+                "dl_montantht": "Montant HT"
+            }
+            df_l_show = df_l[[c for c in cols_l.keys() if c in df_l.columns]].rename(columns=cols_l)
+            show_df(df_l_show, key_suffix=f"{key}_lignes")
+        else:
+            st.warning("Aucune ligne trouvée pour ce document (ou ne correspondant à votre filtre article).")
 
 # ---------------------------------------------------------------------------
 # Sidebar — filtres communs
@@ -59,8 +143,8 @@ with tab1:
                     famille_codes.append(code)
                     famille_names_map[code] = name if name else code
             famille_codes = ["Tous"] + sorted(famille_codes[1:])
-    except Exception:
-        pass
+    except Exception as e:
+        handle_auth_error(e)
 
     col1, col2, col3, col4 = st.columns(4)
     with col1:
@@ -87,7 +171,8 @@ with tab1:
         try:
             depots_list = get_depots(client_schema)
             nbr_depots = len(depots_list) if depots_list else 0
-        except Exception:
+        except Exception as e:
+            handle_auth_error(e)
             nbr_depots = 0
 
     if stocks_data:
@@ -132,158 +217,14 @@ with tab1:
 # Tab 2 : Mouvements ENTRANTS
 # ===========================================================================
 with tab2:
-    st.subheader("Mouvements Entrants")
-
-    with st.expander("🔍 Filtres de date", expanded=True):
-        ce1, ce2 = st.columns(2)
-        with ce1:
-            _today = datetime.date.today()
-            date_from_ent = st.date_input("Date début", value=_today.replace(month=1, day=1), key="ent_date_from")
-        with ce2:
-            date_to_ent = st.date_input("Date fin", value=_today, key="ent_date_to")
-        st.button("▶ Appliquer", type="primary", use_container_width=True, key="btn_ent")
-
-    _date_from_ent = str(date_from_ent)
-    _date_to_ent   = str(date_to_ent)
-
-    with st.spinner("Chargement des mouvements entrants..."):
-        df_ent = get_mouvements_entrants(
-            client_schema=client_schema,
-            ar_ref=search_ref,
-            date_from=_date_from_ent,
-            date_to=_date_to_ent,
-            limit=limit,
-        )
-
-    if not df_ent.empty:
-        total_val_ent  = df_ent["Montant HT"].sum() if "Montant HT" in df_ent.columns else 0
-
-        ke1, ke2 = st.columns(2)
-        ke1.metric("Nombre de documents",  f"{len(df_ent):,}")
-        ke2.metric("Valeur HT entrante",f"{total_val_ent:,.2f} DH")
-        st.divider()
-
-        types_ent = ["Tous"] + sorted(df_ent["Type"].unique().tolist()) if "Type" in df_ent.columns else ["Tous"]
-        sel_type_ent = st.selectbox("Filtrer par type", types_ent, key="sel_type_ent")
-        df_ent_show = df_ent if sel_type_ent == "Tous" else df_ent[df_ent["Type"] == sel_type_ent]
-
-        st.markdown(f"*{len(df_ent_show):,} document(s) affiché(s)*")
-        selection_ent = show_df(
-            df_ent_show.reset_index(drop=True),
-            on_select="rerun",
-            selection_mode="single-row",
-            key_suffix="stock_ent"
-        )
-
-        sel_ent_rows = selection_ent.get("selection", {}).get("rows", [])
-        if sel_ent_rows:
-            row_ent = df_ent_show.reset_index(drop=True).iloc[sel_ent_rows[0]]
-            piece_no = row_ent.get("N° Pièce", "-")
-            st.divider()
-            st.subheader(f"🔍 Lignes du document : {piece_no}")
-            
-            if piece_no and piece_no != "-":
-                with st.spinner("Chargement des lignes..."):
-                    from services.documents_service import get_documents_ligne
-                    filters_l = {}
-                    if search_ref:
-                        filters_l["ar_ref"] = [search_ref]
-                    lignes = get_documents_ligne(client_schema, do_piece=piece_no, filters=filters_l)
-                    
-                if lignes:
-                    df_l = pd.DataFrame(lignes)
-                    cols_l = {
-                        "ar_ref": "Réf. Article",
-                        "dl_design": "Désignation",
-                        "dl_qte": "Qté",
-                        "dl_prixunitaire": "PU HT",
-                        "dl_montantht": "Montant HT"
-                    }
-                    df_l_show = df_l[[c for c in cols_l.keys() if c in df_l.columns]].rename(columns=cols_l)
-                    show_df(df_l_show, key_suffix="ent_lignes")
-                else:
-                    st.warning("Aucune ligne trouvée pour ce document (ou ne correspondant à votre filtre article).")
-    else:
-        st.info("Aucun document entrant trouvé pour les filtres sélectionnés.")
+    render_mouvements_tab("entrant", get_mouvements_entrants, client_schema, search_ref, limit)
 
 
 # ===========================================================================
 # Tab 3 : Mouvements SORTANTS
 # ===========================================================================
 with tab3:
-    st.subheader("Mouvements Sortants")
-
-    with st.expander("🔍 Filtres de date", expanded=True):
-        cs1, cs2 = st.columns(2)
-        with cs1:
-            _today = datetime.date.today()
-            date_from_sort = st.date_input("Date début", value=_today.replace(month=1, day=1), key="sort_date_from")
-        with cs2:
-            date_to_sort = st.date_input("Date fin", value=_today, key="sort_date_to")
-        st.button("▶ Appliquer", type="primary", use_container_width=True, key="btn_sort")
-
-    _date_from_sort = str(date_from_sort)
-    _date_to_sort   = str(date_to_sort)
-
-    with st.spinner("Chargement des mouvements sortants..."):
-        df_sort = get_mouvements_sortants(
-            client_schema=client_schema,
-            ar_ref=search_ref,
-            date_from=_date_from_sort,
-            date_to=_date_to_sort,
-            limit=limit,
-        )
-
-    if not df_sort.empty:
-        total_val_sort = df_sort["Montant HT"].sum() if "Montant HT" in df_sort.columns else 0
-
-        ks1, ks2 = st.columns(2)
-        ks1.metric("Nombre de documents",   f"{len(df_sort):,}")
-        ks2.metric("Valeur HT sortante", f"{total_val_sort:,.2f} DH")
-        st.divider()
-
-        types_sort = ["Tous"] + sorted(df_sort["Type"].unique().tolist()) if "Type" in df_sort.columns else ["Tous"]
-        sel_type_sort = st.selectbox("Filtrer par type", types_sort, key="sel_type_sort")
-        df_sort_show = df_sort if sel_type_sort == "Tous" else df_sort[df_sort["Type"] == sel_type_sort]
-
-        st.markdown(f"*{len(df_sort_show):,} document(s) affiché(s)*")
-        selection_sort = show_df(
-            df_sort_show.reset_index(drop=True),
-            on_select="rerun",
-            selection_mode="single-row",
-            key_suffix="stock_sort"
-        )
-
-        sel_sort_rows = selection_sort.get("selection", {}).get("rows", [])
-        if sel_sort_rows:
-            row_sort = df_sort_show.reset_index(drop=True).iloc[sel_sort_rows[0]]
-            piece_no = row_sort.get("N° Pièce", "-")
-            st.divider()
-            st.subheader(f"🔍 Lignes du document : {piece_no}")
-            
-            if piece_no and piece_no != "-":
-                with st.spinner("Chargement des lignes..."):
-                    from services.documents_service import get_documents_ligne
-                    filters_l = {}
-                    if search_ref:
-                        filters_l["ar_ref"] = [search_ref]
-                    lignes = get_documents_ligne(client_schema, do_piece=piece_no, filters=filters_l)
-                    
-                if lignes:
-                    df_l = pd.DataFrame(lignes)
-                    cols_l = {
-                        "ar_ref": "Réf. Article",
-                        "dl_design": "Désignation",
-                        "dl_qte": "Qté",
-                        "dl_prixunitaire": "PU HT",
-                        "dl_montantht": "Montant HT"
-                    }
-                    df_l_show = df_l[[c for c in cols_l.keys() if c in df_l.columns]].rename(columns=cols_l)
-                    show_df(df_l_show, key_suffix="sort_lignes")
-                else:
-                    st.warning("Aucune ligne trouvée pour ce document (ou ne correspondant à votre filtre article).")
-    else:
-        st.info("Aucun document sortant trouvé pour les filtres sélectionnés.")
+    render_mouvements_tab("sortant", get_mouvements_sortants, client_schema, search_ref, limit)
 
 
 # ===========================================================================

@@ -37,6 +37,36 @@ def _safe_pdf_text(value) -> str:
     return text.replace("?", "").replace("\n", " ").strip()
 
 
+_PLAIN_INT_COLS = frozenset({"Nb Factures", "Code", "Code Collab."})
+
+
+def _format_cell(item, col_name: str = None, plain_int_cols: frozenset = frozenset()) -> str:
+    """Formate une valeur de cellule PDF : floats et ints en `,.2f`, sauf les
+    colonnes de `plain_int_cols` où un int reste affiché tel quel."""
+    if isinstance(item, float):
+        return f"{item:,.2f}"
+    if isinstance(item, int) and col_name not in plain_int_cols:
+        return f"{item:,.2f}"
+    return str(item)
+
+
+def _compute_col_widths(df: pd.DataFrame, page_width: float, plain_int_cols: frozenset = frozenset()) -> list:
+    """Calcule des largeurs de colonnes PDF proportionnelles au contenu max
+    (avec un minimum de 10mm), normalisées pour occuper exactement `page_width`."""
+    col_names = df.columns.tolist()
+    col_max_lens = []
+    for col in col_names:
+        max_len = len(str(col))
+        for item in df[col]:
+            max_len = max(max_len, len(_format_cell(item, col, plain_int_cols)))
+        col_max_lens.append(max_len)
+
+    total_len = sum(col_max_lens) or 1
+    col_widths = [max((w / total_len) * page_width, 10.0) for w in col_max_lens]
+    current_total = sum(col_widths)
+    return [(w / current_total) * page_width for w in col_widths]
+
+
 def export_df_to_pdf(df: pd.DataFrame, title: str, subtitle: str = "") -> bytes:
     """Export a DataFrame to a simple PDF table with numeric values at 2 decimal places."""
     pdf = FPDF(orientation='L', unit='mm', format='A4')
@@ -61,24 +91,7 @@ def export_df_to_pdf(df: pd.DataFrame, title: str, subtitle: str = "") -> bytes:
     if not df.empty:
         col_names = df.columns.tolist()
         page_width = pdf.w - 2 * pdf.l_margin
-
-        col_max_lens = []
-        for col in col_names:
-            max_len = len(str(col))
-            for item in df[col]:
-                if isinstance(item, float):
-                    item_str = f"{item:,.2f}"
-                elif isinstance(item, int) and col not in ["Nb Factures", "Code", "Code Collab."]:
-                    item_str = f"{item:,.2f}"
-                else:
-                    item_str = str(item)
-                max_len = max(max_len, len(item_str))
-            col_max_lens.append(max_len)
-
-        total_len = sum(col_max_lens) or 1
-        col_widths = [max((w / total_len) * page_width, 10.0) for w in col_max_lens]
-        current_total = sum(col_widths)
-        col_widths = [(w / current_total) * page_width for w in col_widths]
+        col_widths = _compute_col_widths(df, page_width, _PLAIN_INT_COLS)
 
         pdf.set_fill_color(41, 128, 185)
         pdf.set_text_color(255, 255, 255)
@@ -92,12 +105,7 @@ def export_df_to_pdf(df: pd.DataFrame, title: str, subtitle: str = "") -> bytes:
         pdf.set_font("Arial", size=7)
         for _, row in df.iterrows():
             for col_name, width, item in zip(col_names, col_widths, row):
-                if isinstance(item, float):
-                    formatted = f"{item:,.2f}"
-                elif isinstance(item, int) and col_name not in ["Nb Factures", "Code", "Code Collab."]:
-                    formatted = f"{item:,.2f}"
-                else:
-                    formatted = str(item)
+                formatted = _format_cell(item, col_name, _PLAIN_INT_COLS)
                 cell_text = formatted.encode('latin-1', 'replace').decode('latin-1')[:50]
                 pdf.cell(width, 7, cell_text, border=1, align='C')
             pdf.ln()
@@ -151,25 +159,7 @@ def export_visite_to_pdf(sections: list, title: str, subtitle: str = "") -> byte
             continue
 
         col_names = df.columns.tolist()
-
-        # Column widths — proportional to max content length
-        col_max_lens = []
-        for col in col_names:
-            max_len = len(str(col))
-            for item in df[col]:
-                if isinstance(item, float):
-                    s = f"{item:,.2f}"
-                elif isinstance(item, int):
-                    s = f"{item:,.2f}"
-                else:
-                    s = str(item)
-                max_len = max(max_len, len(s))
-            col_max_lens.append(max_len)
-
-        total_len = sum(col_max_lens) or 1
-        col_widths = [max((w / total_len) * page_width, 10.0) for w in col_max_lens]
-        current_total = sum(col_widths)
-        col_widths = [(w / current_total) * page_width for w in col_widths]
+        col_widths = _compute_col_widths(df, page_width)
 
         # Header row
         pdf.set_font("Arial", style='B', size=8)
@@ -193,12 +183,7 @@ def export_visite_to_pdf(sections: list, title: str, subtitle: str = "") -> byte
                 pdf.set_font("Arial", size=7)
 
             for col_name, width, item in zip(col_names, col_widths, row):
-                if isinstance(item, float):
-                    formatted = f"{item:,.2f}"
-                elif isinstance(item, int):
-                    formatted = f"{item:,.2f}"
-                else:
-                    formatted = str(item)
+                formatted = _format_cell(item, col_name)
                 pdf.cell(width, 7, _safe_pdf_text(formatted)[:50].encode('latin-1', 'replace').decode('latin-1'), border=1, align='C')
             pdf.ln()
 

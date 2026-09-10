@@ -4,6 +4,7 @@ bi/stock/use_cases/stock_insight_uc.py
 from api.stock.schemas import StockInsightRequest, StockResponse
 from api.stock.repositories.factory_repo import get_repo
 from api.stock.business_logic import alerts
+from api.stock.business_logic.source_meta import extract_source_and_warnings
 
 def execute(req: StockInsightRequest) -> StockResponse:
     repo = get_repo("insight", req.source_type)
@@ -43,12 +44,7 @@ def execute(req: StockInsightRequest) -> StockResponse:
 
     out_cols = [c for c in out_cols if data and c in data[0]]
 
-    # Extraire le timestamp source si présent
-    source = req.source_type
-    if data and "__source_timestamp__" in data[0]:
-        source = f"archive:{data[0].pop('__source_timestamp__')}"
-        for row in data:
-            row.pop("__source_timestamp__", None)
+    source, warnings = extract_source_and_warnings(data, req)
 
     return StockResponse(
         endpoint="/api/stock/insights",
@@ -58,5 +54,5 @@ def execute(req: StockInsightRequest) -> StockResponse:
         columns=out_cols,
         data=data,
         metadata=metadata,
-        warnings=[],
+        warnings=warnings,
     )

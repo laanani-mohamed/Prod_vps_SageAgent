@@ -6,7 +6,7 @@ from etl.validation.val_schema_quality import validate_schema_quality
 from etl.ingestion.ingestor import ingest
 from etl.archive.archiver import archive_folder
 from etl.orchestration.event_store import append_event
-from etl.orchestration.pipeline_state import init_state, fail_state, complete_state, update_step
+from etl.orchestration.pipeline_state import init_state, fail_state, complete_state
 
 logger = logging.getLogger("etl.worker")
 
@@ -53,7 +53,6 @@ def process(folder_path: str, client_schema: str) -> bool:
             return True
                 
         append_event(run_id, client_schema, "SchemaValidationPassed", {})
-        update_step(run_id, client_schema, "validation", "SUCCESS", "ingestion")
 
         # --- Ingestion ---
         append_event(run_id, client_schema, "IngestionStarted", {"folder": folder_path})
@@ -76,7 +75,6 @@ def process(folder_path: str, client_schema: str) -> bool:
             
         # --- Succès ---
         append_event(run_id, client_schema, "IngestionCompleted", {})
-        update_step(run_id, client_schema, "ingestion", "SUCCESS", "archivage")
         archive_folder(folder_path, client_schema, success=True, run_id=run_id)
         append_event(run_id, client_schema, "ArchiveCompleted", {"destination": "success"})
         complete_state(run_id, client_schema)

@@ -5,6 +5,7 @@ import polars as pl
 from api.stock.schemas import ArticleDetailsRequest, StockResponse
 from api.stock.repositories.factory_repo import get_repo
 from api.stock.business_logic import aggregations
+from api.stock.business_logic.source_meta import extract_source_and_warnings
 
 def execute(req: ArticleDetailsRequest) -> StockResponse:
     repo = get_repo("details", req.source_type)
@@ -31,21 +32,7 @@ def execute(req: ArticleDetailsRequest) -> StockResponse:
 
     out_cols = list(data[0].keys()) if data else []
     
-    # Extraire le timestamp source si présent
-    source = req.source_type
-    if data and "__source_timestamp__" in data[0]:
-        source = f"archive:{data[0].pop('__source_timestamp__')}"
-        for row in data:
-            row.pop("__source_timestamp__", None)
-
-    # Warnings pour réf manquantes
-    warnings = []
-    if req.ar_ref:
-        found_refs = {str(row.get("ar_ref", "")).strip() for row in data}
-        for ref in req.ar_ref:
-            if ref not in found_refs:
-                source_label = "la base de données" if "db_latest" in source else "les archives"
-                warnings.append(f"La référence '{ref}' n'existe pas dans {source_label}.")
+    source, warnings = extract_source_and_warnings(data, req)
 
     return StockResponse(
         endpoint="/api/stock/details",

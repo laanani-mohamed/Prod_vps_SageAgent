@@ -1,5 +1,16 @@
 import streamlit as st
 from core.exceptions import AuthError
+from services.base import check_api_health
+
+
+def require_api_health():
+    """
+    Vérifie que l'API backend est joignable.
+    Si non, affiche un message et arrête l'exécution de la page via st.stop().
+    """
+    if not check_api_health():
+        st.error("API injoignable.")
+        st.stop()
 
 
 def require_auth():

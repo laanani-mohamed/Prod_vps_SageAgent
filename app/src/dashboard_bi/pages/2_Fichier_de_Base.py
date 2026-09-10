@@ -8,7 +8,7 @@ import pandas as pd
 from components.styles_fichier_base import apply_fichier_base_css
 from components.data_tables import show_df
 from components.charts import render_product_evolution_chart
-from components.auth_guard import require_auth
+from components.auth_guard import require_auth, handle_auth_error, require_api_health
 
 apply_fichier_base_css()
 require_auth()
@@ -20,18 +20,14 @@ from services.referentiel_service import (
 from services.article_service import get_article_top_clients, get_article_stock_depots, get_article_stats
 from services.tiers_service import search_comptes_tiers
 from services.depot_service import get_depots_summary
-from services.base import check_api_health
 
 st.header("Fichier de Base")
 
 with st.sidebar:
     client_schema = st.session_state.get("client_schema", "")
     limit = 100000000
-    
 
-if not check_api_health():
-    st.error("API injoignable.")
-    st.stop()
+require_api_health()
 
 tab1, tab2, tab3, tab4, tab5 = st.tabs(
     ["Articles", "Clients", "Fournisseurs", "Dépôts", "Familles"]
@@ -73,6 +69,7 @@ def fetch_base_options(schema):
             
         return opts
     except Exception as e:
+        handle_auth_error(e)
         return {"art_des": ["Tout"], "art_ref": ["Tout"], "cli_nom": ["Tout"], "cli_ref": ["Tout"], "fou_nom": ["Tout"], "fou_ref": ["Tout"], "fam_int": ["Tout"], "fam_code": ["Tout"]}
 
 base_opts = fetch_base_options(client_schema)
@@ -93,8 +90,8 @@ with tab1:
                 options_fam.append(code)
                 name = str(f.get("fa_intitule")).strip() if f.get("fa_intitule") else code
                 fam_names_map[code] = name
-    except Exception:
-        pass
+    except Exception as e:
+        handle_auth_error(e)
         
     col1, col2, col3 = st.columns(3)
     with col1:

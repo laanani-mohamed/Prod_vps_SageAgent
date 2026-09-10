@@ -102,6 +102,12 @@ class ValeurStockRequest(BaseBIRequest):
     pass
 
 
+class RapportConsommationRequest(BaseBIRequest):
+    """Consommation des articles par famille/produit — fenêtre 6 mois glissants."""
+    date_from: Optional[str] = Field(None, description="Calculé automatiquement (J-180) si absent")
+    date_to:   Optional[str] = Field(None, description="Calculé automatiquement (aujourd'hui) si absent")
+
+
 class TopClientsRequest(BaseBIRequest):
     date_from: Optional[str] = None
     date_to: Optional[str] = None

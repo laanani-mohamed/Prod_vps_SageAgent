@@ -18,7 +18,6 @@ Contraintes :
 
 import logging
 import polars as pl
-#import pyarrow.csv as pa_csv
 import psycopg2
 from typing import List, Dict
 

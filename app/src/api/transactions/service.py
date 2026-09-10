@@ -8,7 +8,7 @@ import logging
 import psycopg2
 import polars as pl
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Sequence
 
 from api.db import get_db_connection
 from config.etl_config import ARCHIVE_BASE_PATH
@@ -45,12 +45,7 @@ def _from_db(req: TransactionsRequest, endpoint: str) -> TransactionsResponse:
                 rows = cur.fetchall()
 
             data = [dict(zip(col_aliases, row)) for row in rows]
-            
-            message = None
-            # Si la requête retourne une seule ligne avec nb_documents=0 ou tout null, c'est vide
-            if not data or (len(data) == 1 and (data[0].get("nb_documents") == 0 or all(v is None for k, v in data[0].items() if k != "nb_documents"))):
-                message = "transaction introuvable"
-                data = []
+            message, data = _empty_result_message(data)
 
             return TransactionsResponse(
                 endpoint=endpoint,
@@ -123,28 +118,10 @@ def _from_archive(req: TransactionsRequest, endpoint: str) -> TransactionsRespon
             df = df.filter(pl.col("do_date") <= period.end_date)
 
     # Calcul des métriques & Group By
+    agg_exprs = _build_agg_exprs(m, df.columns)
     if req.group_by:
         valid_group = [g.lower() for g in req.group_by if g.lower() in df.columns]
         if valid_group:
-            agg_exprs = []
-            if "ca_ht" in m and "dl_montantht" in df.columns:
-                agg_exprs.append(pl.col("dl_montantht").cast(pl.Float64).sum().alias("ca_ht"))
-            if "ca_ttc" in m and "dl_montantttc" in df.columns:
-                agg_exprs.append(pl.col("dl_montantttc").cast(pl.Float64).sum().alias("ca_ttc"))
-            if "quantite_vendue" in m and "dl_qte" in df.columns:
-                agg_exprs.append(pl.col("dl_qte").cast(pl.Float64).sum().alias("quantite"))
-            if "prix_unitaire_moyen" in m and "dl_prixunitaire" in df.columns:
-                agg_exprs.append(pl.col("dl_prixunitaire").cast(pl.Float64).mean().alias("prix_unitaire_moyen"))
-            if "nb_documents" in m and "do_piece" in df.columns:
-                agg_exprs.append(pl.col("do_piece").n_unique().alias("nb_documents"))
-            
-            # Marge brute : SUM((PU - CMUP) * QTE)
-            if "marge_brute" in m and "dl_prixunitaire" in df.columns and "dl_cmup" in df.columns and "dl_qte" in df.columns:
-                agg_exprs.append(
-                    ((pl.col("dl_prixunitaire").cast(pl.Float64) - pl.col("dl_cmup").cast(pl.Float64).fill_null(0.0)) * pl.col("dl_qte").cast(pl.Float64))
-                    .sum().alias("marge_brute")
-                )
-
             if agg_exprs:
                 df = df.group_by(valid_group).agg(agg_exprs)
             else:
@@ -152,25 +129,12 @@ def _from_archive(req: TransactionsRequest, endpoint: str) -> TransactionsRespon
                 df = df.group_by(valid_group).first()
     else:
         # Agrégation globale (une seule ligne retournée)
-        agg_exprs = []
-        if "ca_ht" in m and "dl_montantht" in df.columns:
-            agg_exprs.append(pl.col("dl_montantht").cast(pl.Float64).sum().alias("ca_ht"))
-        if "ca_ttc" in m and "dl_montantttc" in df.columns:
-            agg_exprs.append(pl.col("dl_montantttc").cast(pl.Float64).sum().alias("ca_ttc"))
-        if "quantite_vendue" in m and "dl_qte" in df.columns:
-            agg_exprs.append(pl.col("dl_qte").cast(pl.Float64).sum().alias("quantite"))
-        if "nb_documents" in m and "do_piece" in df.columns:
-            agg_exprs.append(pl.col("do_piece").n_unique().alias("nb_documents"))
         if agg_exprs:
             df = df.select(agg_exprs)
 
     # no limit
     data = df.to_dicts()
-
-    message = None
-    if not data or (len(data) == 1 and (data[0].get("nb_documents") == 0 or all(v is None for k, v in data[0].items() if k != "nb_documents"))):
-        message = "transaction introuvable"
-        data = []
+    message, data = _empty_result_message(data)
 
     return TransactionsResponse(
         endpoint=endpoint,
@@ -179,6 +143,42 @@ def _from_archive(req: TransactionsRequest, endpoint: str) -> TransactionsRespon
         message=message,
         data=data,
     )
+
+
+# ---------------------------------------------------------------------------
+# Helpers communs (agrégation, résultat vide)
+# ---------------------------------------------------------------------------
+
+def _build_agg_exprs(metrics: Sequence[str], df_columns: Sequence[str]) -> list:
+    """Construit les expressions d'agrégation polars pour les métriques demandées,
+    communes au group-by et à l'agrégation globale."""
+    agg_exprs = []
+    if "ca_ht" in metrics and "dl_montantht" in df_columns:
+        agg_exprs.append(pl.col("dl_montantht").cast(pl.Float64).sum().alias("ca_ht"))
+    if "ca_ttc" in metrics and "dl_montantttc" in df_columns:
+        agg_exprs.append(pl.col("dl_montantttc").cast(pl.Float64).sum().alias("ca_ttc"))
+    if "quantite_vendue" in metrics and "dl_qte" in df_columns:
+        agg_exprs.append(pl.col("dl_qte").cast(pl.Float64).sum().alias("quantite"))
+    if "prix_unitaire_moyen" in metrics and "dl_prixunitaire" in df_columns:
+        agg_exprs.append(pl.col("dl_prixunitaire").cast(pl.Float64).mean().alias("prix_unitaire_moyen"))
+    if "nb_documents" in metrics and "do_piece" in df_columns:
+        agg_exprs.append(pl.col("do_piece").n_unique().alias("nb_documents"))
+
+    # Marge brute : SUM((PU - CMUP) * QTE)
+    if "marge_brute" in metrics and "dl_prixunitaire" in df_columns and "dl_cmup" in df_columns and "dl_qte" in df_columns:
+        agg_exprs.append(
+            ((pl.col("dl_prixunitaire").cast(pl.Float64) - pl.col("dl_cmup").cast(pl.Float64).fill_null(0.0)) * pl.col("dl_qte").cast(pl.Float64))
+            .sum().alias("marge_brute")
+        )
+    return agg_exprs
+
+
+def _empty_result_message(data: list) -> tuple[Optional[str], list]:
+    """Détecte un résultat vide (aucune ligne, ou une ligne nb_documents=0/tout null)
+    et renvoie (message, data) — data devient [] si le résultat est considéré vide."""
+    if not data or (len(data) == 1 and (data[0].get("nb_documents") == 0 or all(v is None for k, v in data[0].items() if k != "nb_documents"))):
+        return "transaction introuvable", []
+    return None, data
 
 
 # ---------------------------------------------------------------------------

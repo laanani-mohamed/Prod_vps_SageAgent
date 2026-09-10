@@ -10,7 +10,7 @@ import plotly.graph_objects as go
 
 from components.styles_initiale import apply_custom_css
 from components.data_tables import show_df
-from components.auth_guard import require_auth
+from components.auth_guard import require_auth, handle_auth_error
 
 apply_custom_css()
 require_auth()
@@ -82,6 +82,7 @@ with st.spinner("Calcul des indicateurs principaux..."):
         pct_ca = next((obj.get("pct_atteinte") for obj in objectifs if obj.get("axe") == "Performance Commerciale"), None)
         pct_encours = next((obj.get("pct_atteinte") for obj in objectifs if obj.get("axe") == "Encours Clients"), None)
     except Exception as e:
+        handle_auth_error(e)
         ca = ca_n_1 = achats = valeur_stock = encours_clients = dettes_fournisseurs = ca_evo = 0.0
         nb_clients = 0
         pct_ca = None
@@ -225,7 +226,8 @@ st.divider()
 with st.spinner("Calcul des KPIs analytiques..."):
     try:
         analytique = get_dashboard_analytique(client_schema, ytd_from, ytd_to)
-    except Exception:
+    except Exception as e:
+        handle_auth_error(e)
         analytique = {}
 
 st.subheader("Indicateurs Analytiques")

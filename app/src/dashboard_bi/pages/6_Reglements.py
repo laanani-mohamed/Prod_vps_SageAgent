@@ -8,20 +8,17 @@ import streamlit as st
 import pandas as pd
 from components.styles_initiale import apply_custom_css
 from components.data_tables import show_df
-from components.auth_guard import require_auth, handle_auth_error
+from components.auth_guard import require_auth, handle_auth_error, require_api_health
 
 apply_custom_css()
 require_auth()
 
 from services.documents_service import get_documents_ligne
 from services.reglements_service import get_formatted_reglements
-from services.base import check_api_health
 
 st.header("Règlements & Flux Financiers")
 
-if not check_api_health():
-    st.error("API injoignable.")
-    st.stop()
+require_api_health()
 
 # ---------------------------------------------------------------------------
 # Filtres globaux dans la barre latérale

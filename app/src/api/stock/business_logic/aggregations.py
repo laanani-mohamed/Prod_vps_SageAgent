@@ -53,69 +53,6 @@ def aggregate_availability(raw_data: List[Dict[str, Any]]) -> List[Dict[str, Any
     return results
 
 
-def generate_summary_statistics(
-    raw_data: List[Dict[str, Any]], 
-    summary_type: str, 
-    top_n: int = 10, 
-    least_n: int = 10
-) -> List[Dict[str, Any]]:
-    """Génère des statistiques de résumé de stock (global, famille, top, least)."""
-    if not raw_data:
-        return []
-        
-    df = pl.DataFrame(raw_data)
-    
-    # Si la colonne as_qtesto n'existe pas, on ne peut rien faire
-    if "as_qtesto" not in df.columns:
-        return []
-
-    if summary_type == "global":
-        exprs = [
-            pl.col("ar_ref").n_unique().alias("nb_references") if "ar_ref" in df.columns else pl.lit(0).alias("nb_references"),
-            pl.col("as_qtesto").cast(pl.Float64, strict=False).sum().alias("quantite_totale"),
-        ]
-        if "ar_prixach" in df.columns:
-            exprs.append((pl.col("as_qtesto").cast(pl.Float64, strict=False) * pl.col("ar_prixach").cast(pl.Float64, strict=False)).sum().alias("valeur_totale_achat"))
-        
-        df_agg = df.select(exprs)
-
-    elif summary_type == "by_family":
-        if "fa_codefamille" not in df.columns:
-            return []
-        df_agg = df.group_by("fa_codefamille").agg([
-            pl.col("ar_ref").n_unique().alias("nb_references") if "ar_ref" in df.columns else pl.lit(0).alias("nb_references"),
-            pl.col("as_qtesto").cast(pl.Float64, strict=False).sum().alias("quantite_totale")
-        ]).sort("quantite_totale", descending=True)
-
-    elif summary_type == "top_n":
-        group_cols = ["ar_ref"]
-        if "ar_design" in df.columns:
-            group_cols.append("ar_design")
-            
-        df_agg = df.group_by(group_cols).agg([
-            pl.col("as_qtesto").cast(pl.Float64, strict=False).sum().alias("quantite_totale")
-        ]).sort("quantite_totale", descending=True).head(top_n)
-
-    elif summary_type == "least_n":
-        group_cols = ["ar_ref"]
-        if "ar_design" in df.columns:
-            group_cols.append("ar_design")
-            
-        df_agg = df.group_by(group_cols).agg([
-            pl.col("as_qtesto").cast(pl.Float64, strict=False).sum().alias("quantite_totale")
-        ]).filter(pl.col("quantite_totale") > 0).sort("quantite_totale", descending=False).head(least_n)
-
-    else:
-        # Fallback pour tout autre type
-        exprs = [
-            pl.col("ar_ref").n_unique().alias("nb_references") if "ar_ref" in df.columns else pl.lit(0).alias("nb_references"),
-            pl.col("as_qtesto").cast(pl.Float64, strict=False).sum().alias("quantite_totale")
-        ]
-        df_agg = df.select(exprs)
-
-    return df_agg.to_dicts()
-
-
 def aggregate_by_depot(raw_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Agrège le stock par article ET par dépôt."""
     if not raw_data:
