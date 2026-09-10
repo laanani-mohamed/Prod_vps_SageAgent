@@ -101,3 +101,67 @@ def calculate_balance_client(data: List[Dict[str, Any]]) -> List[Dict[str, Any]]
     })
 
     return df_agg.to_dicts()
+
+
+def calculate_balance_agee(data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Prend les factures impayées, calcule l'ancienneté en jours par rapport à
+    aujourd'hui (sur DO_Date — aucune date d'échéance distincte disponible
+    dans le schéma Sage), et répartit le reste_a_payer dans les tranches
+    0-60j / 60-90j / 90-120j / +120j. Agrégé par client.
+    """
+    if not data:
+        return []
+
+    df = pl.DataFrame(data)
+
+    if df.is_empty():
+        return []
+
+    expected_cols = ["do_piece", "do_date", "do_tiers", "ct_intitule", "reste_a_payer"]
+    for c in expected_cols:
+        if c not in df.columns:
+            return []
+
+    today = date.today()
+
+    df = df.with_columns([
+        pl.col("do_date").str.slice(0, 10).str.to_date("%Y-%m-%d", strict=False).alias("date_parsed")
+    ])
+
+    df = df.with_columns([
+        pl.col("reste_a_payer").cast(pl.Float64)
+    ])
+
+    # Ancienneté en jours. Facture invalide/absente -> Non Échu par défaut (day_diff = 0).
+    df = df.with_columns([
+        (pl.lit(today) - pl.col("date_parsed")).dt.total_days().fill_null(0).alias("day_diff")
+    ])
+
+    df = df.with_columns([
+        pl.when(pl.col("day_diff") <= 60).then(pl.col("reste_a_payer")).otherwise(0.0).alias("j0_60"),
+        pl.when((pl.col("day_diff") > 60) & (pl.col("day_diff") <= 90)).then(pl.col("reste_a_payer")).otherwise(0.0).alias("j60_90"),
+        pl.when((pl.col("day_diff") > 90) & (pl.col("day_diff") <= 120)).then(pl.col("reste_a_payer")).otherwise(0.0).alias("j90_120"),
+        pl.when(pl.col("day_diff") > 120).then(pl.col("reste_a_payer")).otherwise(0.0).alias("j120_plus"),
+    ])
+
+    df_agg = df.group_by(["do_tiers", "ct_intitule"]).agg([
+        pl.sum("j0_60").alias("0-60j"),
+        pl.sum("j60_90").alias("60-90j"),
+        pl.sum("j90_120").alias("90-120j"),
+        pl.sum("j120_plus").alias("+120j"),
+    ])
+
+    df_agg = df_agg.with_columns([
+        (pl.col("0-60j") + pl.col("60-90j") + pl.col("90-120j")
+         + pl.col("+120j")).alias("Totale")
+    ])
+
+    df_agg = df_agg.sort("Totale", descending=True)
+
+    df_agg = df_agg.rename({
+        "do_tiers": "Ref Client",
+        "ct_intitule": "Nom Client"
+    })
+
+    return df_agg.to_dicts()

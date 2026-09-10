@@ -26,7 +26,7 @@ from api.bi.service import (
     get_dashboard, get_objectifs, get_analytique,
     get_rapport_ca, get_top_clients, get_top_articles,
     get_balance_client, get_rapport_visite, get_valeur_stock,
-    get_rapport_consommation,
+    get_rapport_consommation, get_balance_agee,
 )
 
 logger = logging.getLogger("api.bi.router")
@@ -222,6 +222,26 @@ def rapport_valeur_stock(
     return secured_handle(
         get_valeur_stock,
         endpoint="/api/bi/rapport/valeur-stock",
+        request=request,
+        current_user=current_user,
+        client_schema=req.client_schema,
+        req=req
+    )
+
+
+@router.post(
+    "/rapport/balance-agee",
+    response_model=RapportResponse,
+    summary="Balance âgée par clients (tranches en jours)",
+)
+def rapport_balance_agee(
+    req: BalanceClientRequest,
+    request: Request,
+    current_user: TokenData = Depends(require_role("analyst"))
+) -> RapportResponse:
+    return secured_handle(
+        get_balance_agee,
+        endpoint="/api/bi/rapport/balance-agee",
         request=request,
         current_user=current_user,
         client_schema=req.client_schema,

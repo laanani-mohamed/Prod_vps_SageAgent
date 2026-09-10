@@ -26,6 +26,7 @@ from api.bi.use_cases import (
     top_clients_uc,
     top_articles_uc,
     balance_uc,
+    balance_agee_uc,
     rapport_visite_uc,
     valeur_stock_uc,
     consommation_uc,
@@ -92,3 +93,9 @@ def get_rapport_consommation(req: RapportConsommationRequest) -> RapportResponse
     """Consommation des articles par famille/produit (6 mois glissants)."""
     logger.info("[BI] rapport/consommation | schema=%s", req.client_schema)
     return consommation_uc.execute(req)
+
+
+def get_balance_agee(req: BalanceClientRequest) -> RapportResponse:
+    """Balance âgée par clients (tranches en jours : Non Échu, 0-30j, 31-60j, 61-90j, +90j)."""
+    logger.info("[BI] rapport/balance-agee | schema=%s", req.client_schema)
+    return balance_agee_uc.execute(req)

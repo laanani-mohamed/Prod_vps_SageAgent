@@ -144,6 +144,26 @@ def fetch_balance_client():
         return []
 
 @st.cache_data(ttl=600, show_spinner=False)
+def fetch_balance_agee():
+    """Récupère la balance âgée par clients (tranches en jours)."""
+    if not token:
+        return []
+
+    payload = {
+        "client_schema": client_schema,
+        "source_type": "db_latest"
+    }
+    try:
+        r = httpx.post(f"{API_BASE_URL}/api/bi/rapport/balance-agee", json=payload, headers=headers, timeout=15.0)
+        if r.status_code == 200:
+            return r.json().get("data", [])
+        st.error(f"Erreur API BI ({r.status_code}) : {r.text}")
+        return []
+    except Exception as e:
+        st.error(f"Erreur de connexion API BI : {e}")
+        return []
+
+@st.cache_data(ttl=600, show_spinner=False)
 def fetch_valeur_stock():
     """Récupère la valeur du stock par dépôt/famille/article."""
     if not token:
@@ -184,7 +204,7 @@ def fetch_consommation():
 # ---------------------------------------------------------------------------
 # Onglets
 # ---------------------------------------------------------------------------
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
     "1. Chiffre d'Affaire",
     "2. Comparaison CA",
     "3. Balance",
@@ -193,6 +213,7 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
     "6. Produits Dormants",
     "7. Lots en Péremption",
     "8. Consommation par Produit",
+    "9. Balance Âgée",
 
 ])
 
@@ -959,3 +980,51 @@ with tab8:
                 pdf_title="Rapport Consommation par Produit",
                 pdf_subtitle=f"6 derniers mois — Généré le {date.today().isoformat()}",
             )
+
+# ---------------------------------------------------------------------------
+# Tab 9 : Balance Âgée
+# ---------------------------------------------------------------------------
+with tab9:
+    st.subheader("Balance Âgée par Clients")
+
+    agee_clicked = st.button("Afficher la Balance Âgée", type="primary", key="btn_balance_agee")
+
+    if agee_clicked:
+        with st.spinner("Génération de la balance âgée..."):
+            data = fetch_balance_agee()
+            if data:
+                df = pd.DataFrame(data)
+
+                if 'Nom Client' in df.columns:
+                    df['Nom Client'] = df['Nom Client'].replace({0: "Non Identifier", "0": "Non Identifier", "": "Non Identifier"})
+
+                desired_cols = ["Ref Client", "Nom Client", "0-60j", "60-90j", "90-120j", "+120j", "Totale"]
+                available_cols = [c for c in desired_cols if c in df.columns]
+                df_show = df[available_cols]
+
+                st.session_state['df_tab9'] = df_show
+            else:
+                st.session_state['df_tab9'] = pd.DataFrame()
+                st.info("Aucune donnée de balance âgée trouvée.")
+
+    df_t9 = st.session_state.get('df_tab9')
+    if df_t9 is not None and not df_t9.empty:
+        numeric_cols = ["0-60j", "60-90j", "90-120j", "+120j", "Totale"]
+        format_dict = {col: "{:,.2f}" for col in numeric_cols if col in df_t9.columns}
+
+        st.markdown("**Balance âgée générale :**")
+        sums = df_t9[[c for c in numeric_cols if c in df_t9.columns]].sum()
+        df_sums = pd.DataFrame([sums])
+        df_sums.insert(0, "Nom Client", len(df_t9))
+        st.dataframe(df_sums.style.format(format_dict))
+
+        st.markdown("**Détail de la balance âgée :**")
+        st.dataframe(df_t9.style.format(format_dict))
+
+        render_export_buttons(
+            df_t9,
+            filename_base=f"Balance_Agee_{date.today().isoformat()}",
+            pdf_section_title="Balance Âgée par Clients",
+            pdf_title="Rapport Balance Âgée",
+            pdf_subtitle=f"Généré le {date.today().isoformat()}",
+        )
