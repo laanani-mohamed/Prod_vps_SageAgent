@@ -1,6 +1,6 @@
-import json, collections
+import json, collections, os
 
-outdir = "/tmp/claude-1001/-opt-SageAgent/ab3908b7-4d5a-4ea3-a93b-cea3ee39c9ae/scratchpad/graphify-out"
+outdir = os.path.dirname(os.path.abspath(__file__))
 data = json.load(open(outdir + "/graph.json"))
 nodes = {n["id"]: n for n in data["nodes"]}
 edges = data["edges"]

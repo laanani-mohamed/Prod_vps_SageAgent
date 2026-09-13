@@ -108,6 +108,16 @@ for f in py_files:
             add_node(fid, node.name, "function", os.path.relpath(f, ROOT))
             add_edge(mid, fid, "DEFINES", "EXTRACTED")
 
+    # Streamlit : st.Page("pages/x.py") enregistre une page par chemin, sans import.
+    for node in ast.walk(tree):
+        if (isinstance(node, ast.Call)
+                and getattr(node.func, "attr", getattr(node.func, "id", None)) == "Page"
+                and node.args and isinstance(node.args[0], ast.Constant)
+                and isinstance(node.args[0].value, str)):
+            page_path = os.path.normpath(os.path.join(os.path.dirname(f), node.args[0].value))
+            if page_path in mod_ids:
+                add_edge(mid, mod_ids[page_path], "REGISTERS_PAGE", "EXTRACTED")
+
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for alias in node.names:
@@ -137,8 +147,7 @@ for f in py_files:
                 add_edge(mid, "ext:" + root_ext, "IMPORTS", "EXTRACTED")
 
 out = {"nodes": list(nodes.values()), "edges": edges}
-outdir = "/tmp/claude-1001/-opt-SageAgent/ab3908b7-4d5a-4ea3-a93b-cea3ee39c9ae/scratchpad/graphify-out"
-os.makedirs(outdir, exist_ok=True)
+outdir = os.path.dirname(os.path.abspath(__file__))
 with open(os.path.join(outdir, "graph.json"), "w") as fh:
     json.dump(out, fh, indent=1)
 

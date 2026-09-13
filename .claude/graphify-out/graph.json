@@ -1039,6 +1039,12 @@
    "path": "app/src/dashboard_bi/pages/8_Agent_BI.py"
   },
   {
+   "id": "mod:app.src.dashboard_bi.pages.9_Nouveau_Bon_Commande",
+   "label": "app.src.dashboard_bi.pages.9_Nouveau_Bon_Commande",
+   "type": "module",
+   "path": "app/src/dashboard_bi/pages/9_Nouveau_Bon_Commande.py"
+  },
+  {
    "id": "mod:app.src.dashboard_bi.services",
    "label": "app.src.dashboard_bi.services",
    "type": "module",
@@ -3665,6 +3671,24 @@
    "label": "io",
    "type": "external_module",
    "path": null
+  },
+  {
+   "id": "mod:app.src.dashboard_bi.pages.9_Nouveau_Bon_Commande:_total_ligne",
+   "label": "_total_ligne",
+   "type": "function",
+   "path": "app/src/dashboard_bi/pages/9_Nouveau_Bon_Commande.py"
+  },
+  {
+   "id": "mod:app.src.dashboard_bi.pages.9_Nouveau_Bon_Commande:oublier_widgets_ligne",
+   "label": "oublier_widgets_ligne",
+   "type": "function",
+   "path": "app/src/dashboard_bi/pages/9_Nouveau_Bon_Commande.py"
+  },
+  {
+   "id": "mod:app.src.dashboard_bi.pages.9_Nouveau_Bon_Commande:fetch_clients_et_familles",
+   "label": "fetch_clients_et_familles",
+   "type": "function",
+   "path": "app/src/dashboard_bi/pages/9_Nouveau_Bon_Commande.py"
   },
   {
    "id": "mod:app.src.dashboard_bi.services.article_service:get_article_top_clients",
@@ -10282,6 +10306,54 @@
   },
   {
    "source": "mod:app.src.dashboard_bi.app",
+   "target": "mod:app.src.dashboard_bi.pages.1_Tableau_de_Bord",
+   "type": "REGISTERS_PAGE",
+   "confidence": "EXTRACTED"
+  },
+  {
+   "source": "mod:app.src.dashboard_bi.app",
+   "target": "mod:app.src.dashboard_bi.pages.2_Fichier_de_Base",
+   "type": "REGISTERS_PAGE",
+   "confidence": "EXTRACTED"
+  },
+  {
+   "source": "mod:app.src.dashboard_bi.app",
+   "target": "mod:app.src.dashboard_bi.pages.3_Gestion_Ventes",
+   "type": "REGISTERS_PAGE",
+   "confidence": "EXTRACTED"
+  },
+  {
+   "source": "mod:app.src.dashboard_bi.app",
+   "target": "mod:app.src.dashboard_bi.pages.4_Gestion_Achats",
+   "type": "REGISTERS_PAGE",
+   "confidence": "EXTRACTED"
+  },
+  {
+   "source": "mod:app.src.dashboard_bi.app",
+   "target": "mod:app.src.dashboard_bi.pages.5_Mouvements_Stock",
+   "type": "REGISTERS_PAGE",
+   "confidence": "EXTRACTED"
+  },
+  {
+   "source": "mod:app.src.dashboard_bi.app",
+   "target": "mod:app.src.dashboard_bi.pages.6_Reglements",
+   "type": "REGISTERS_PAGE",
+   "confidence": "EXTRACTED"
+  },
+  {
+   "source": "mod:app.src.dashboard_bi.app",
+   "target": "mod:app.src.dashboard_bi.pages.7_Rapports",
+   "type": "REGISTERS_PAGE",
+   "confidence": "EXTRACTED"
+  },
+  {
+   "source": "mod:app.src.dashboard_bi.app",
+   "target": "mod:app.src.dashboard_bi.pages.9_Nouveau_Bon_Commande",
+   "type": "REGISTERS_PAGE",
+   "confidence": "EXTRACTED"
+  },
+  {
+   "source": "mod:app.src.dashboard_bi.app",
    "target": "ext:sys",
    "type": "IMPORTS",
    "confidence": "EXTRACTED"
@@ -10318,7 +10390,7 @@
   },
   {
    "source": "mod:app.src.dashboard_bi.app",
-   "target": "mod:app.config",
+   "target": "mod:app.src.dashboard_bi.config",
    "type": "IMPORTS",
    "confidence": "INFERRED"
   },
@@ -10330,7 +10402,7 @@
   },
   {
    "source": "mod:app.src.dashboard_bi.app",
-   "target": "mod:app.src.dashboard_bi.config",
+   "target": "mod:app.config",
    "type": "IMPORTS",
    "confidence": "INFERRED"
   },
@@ -10342,7 +10414,7 @@
   },
   {
    "source": "mod:app.src.dashboard_bi.app",
-   "target": "mod:app.config",
+   "target": "mod:app.src.dashboard_bi.config",
    "type": "IMPORTS",
    "confidence": "INFERRED"
   },
@@ -10354,7 +10426,7 @@
   },
   {
    "source": "mod:app.src.dashboard_bi.app",
-   "target": "mod:app.src.dashboard_bi.config",
+   "target": "mod:app.config",
    "type": "IMPORTS",
    "confidence": "INFERRED"
   },
@@ -11272,7 +11344,7 @@
   },
   {
    "source": "mod:app.src.dashboard_bi.pages.7_Rapports",
-   "target": "mod:app.config",
+   "target": "mod:app.src.dashboard_bi.config",
    "type": "IMPORTS",
    "confidence": "INFERRED"
   },
@@ -11284,7 +11356,7 @@
   },
   {
    "source": "mod:app.src.dashboard_bi.pages.7_Rapports",
-   "target": "mod:app.src.dashboard_bi.config",
+   "target": "mod:app.config",
    "type": "IMPORTS",
    "confidence": "INFERRED"
   },
@@ -11315,6 +11387,90 @@
   {
    "source": "mod:app.src.dashboard_bi.pages.8_Agent_BI",
    "target": "mod:app.src.dashboard_bi.components.styles_initiale",
+   "type": "IMPORTS",
+   "confidence": "INFERRED"
+  },
+  {
+   "source": "mod:app.src.dashboard_bi.pages.9_Nouveau_Bon_Commande",
+   "target": "mod:app.src.dashboard_bi.pages.9_Nouveau_Bon_Commande:_total_ligne",
+   "type": "DEFINES",
+   "confidence": "EXTRACTED"
+  },
+  {
+   "source": "mod:app.src.dashboard_bi.pages.9_Nouveau_Bon_Commande",
+   "target": "mod:app.src.dashboard_bi.pages.9_Nouveau_Bon_Commande:oublier_widgets_ligne",
+   "type": "DEFINES",
+   "confidence": "EXTRACTED"
+  },
+  {
+   "source": "mod:app.src.dashboard_bi.pages.9_Nouveau_Bon_Commande",
+   "target": "mod:app.src.dashboard_bi.pages.9_Nouveau_Bon_Commande:fetch_clients_et_familles",
+   "type": "DEFINES",
+   "confidence": "EXTRACTED"
+  },
+  {
+   "source": "mod:app.src.dashboard_bi.pages.9_Nouveau_Bon_Commande",
+   "target": "ext:re",
+   "type": "IMPORTS",
+   "confidence": "EXTRACTED"
+  },
+  {
+   "source": "mod:app.src.dashboard_bi.pages.9_Nouveau_Bon_Commande",
+   "target": "ext:datetime",
+   "type": "IMPORTS",
+   "confidence": "EXTRACTED"
+  },
+  {
+   "source": "mod:app.src.dashboard_bi.pages.9_Nouveau_Bon_Commande",
+   "target": "ext:streamlit",
+   "type": "IMPORTS",
+   "confidence": "EXTRACTED"
+  },
+  {
+   "source": "mod:app.src.dashboard_bi.pages.9_Nouveau_Bon_Commande",
+   "target": "ext:pandas",
+   "type": "IMPORTS",
+   "confidence": "EXTRACTED"
+  },
+  {
+   "source": "mod:app.src.dashboard_bi.pages.9_Nouveau_Bon_Commande",
+   "target": "mod:app.src.dashboard_bi.components.styles_initiale",
+   "type": "IMPORTS",
+   "confidence": "INFERRED"
+  },
+  {
+   "source": "mod:app.src.dashboard_bi.pages.9_Nouveau_Bon_Commande",
+   "target": "mod:app.src.dashboard_bi.components.data_tables",
+   "type": "IMPORTS",
+   "confidence": "INFERRED"
+  },
+  {
+   "source": "mod:app.src.dashboard_bi.pages.9_Nouveau_Bon_Commande",
+   "target": "mod:app.src.dashboard_bi.components.auth_guard",
+   "type": "IMPORTS",
+   "confidence": "INFERRED"
+  },
+  {
+   "source": "mod:app.src.dashboard_bi.pages.9_Nouveau_Bon_Commande",
+   "target": "mod:app.src.dashboard_bi.core.constants",
+   "type": "IMPORTS",
+   "confidence": "INFERRED"
+  },
+  {
+   "source": "mod:app.src.dashboard_bi.pages.9_Nouveau_Bon_Commande",
+   "target": "mod:app.src.dashboard_bi.core.formatters",
+   "type": "IMPORTS",
+   "confidence": "INFERRED"
+  },
+  {
+   "source": "mod:app.src.dashboard_bi.pages.9_Nouveau_Bon_Commande",
+   "target": "mod:app.src.dashboard_bi.services.referentiel_service",
+   "type": "IMPORTS",
+   "confidence": "INFERRED"
+  },
+  {
+   "source": "mod:app.src.dashboard_bi.pages.9_Nouveau_Bon_Commande",
+   "target": "mod:app.src.dashboard_bi.utils.exports",
    "type": "IMPORTS",
    "confidence": "INFERRED"
   },
@@ -11488,7 +11644,7 @@
   },
   {
    "source": "mod:app.src.dashboard_bi.services.base",
-   "target": "mod:app.config",
+   "target": "mod:app.src.dashboard_bi.config",
    "type": "IMPORTS",
    "confidence": "INFERRED"
   },
@@ -11500,7 +11656,7 @@
   },
   {
    "source": "mod:app.src.dashboard_bi.services.base",
-   "target": "mod:app.src.dashboard_bi.config",
+   "target": "mod:app.config",
    "type": "IMPORTS",
    "confidence": "INFERRED"
   },
@@ -11632,7 +11788,7 @@
   },
   {
    "source": "mod:app.src.dashboard_bi.services.documents_service",
-   "target": "mod:app.config",
+   "target": "mod:app.src.dashboard_bi.config",
    "type": "IMPORTS",
    "confidence": "INFERRED"
   },
@@ -11644,7 +11800,7 @@
   },
   {
    "source": "mod:app.src.dashboard_bi.services.documents_service",
-   "target": "mod:app.src.dashboard_bi.config",
+   "target": "mod:app.config",
    "type": "IMPORTS",
    "confidence": "INFERRED"
   },
