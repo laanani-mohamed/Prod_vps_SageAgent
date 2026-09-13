@@ -136,8 +136,8 @@ else:
             st.Page("pages/6_Reglements.py", title="Règlements"),
             st.Page("pages/7_Rapports.py",   title="Rapports BI"),
         ],
-        "Agent BI": [
-            st.Page("pages/8_Agent_BI.py", title="Agent Conversationnel"),
+        "Passer bon de commande": [
+            st.Page("pages/9_Nouveau_Bon_Commande.py", title="Passer bon de commande"),
         ],
     }
 

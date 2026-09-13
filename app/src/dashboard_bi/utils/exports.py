@@ -67,8 +67,12 @@ def _compute_col_widths(df: pd.DataFrame, page_width: float, plain_int_cols: fro
     return [(w / current_total) * page_width for w in col_widths]
 
 
-def export_df_to_pdf(df: pd.DataFrame, title: str, subtitle: str = "") -> bytes:
-    """Export a DataFrame to a simple PDF table with numeric values at 2 decimal places."""
+def export_df_to_pdf(df: pd.DataFrame, title: str, subtitle: str = "", recap_rows: int = 0) -> bytes:
+    """Export a DataFrame to a simple PDF table with numeric values at 2 decimal places.
+
+    `recap_rows` : nombre de lignes finales de récapitulatif. Sur ces lignes, les cellules
+    qui précèdent la première valeur renseignée sont tracées sans bordure.
+    """
     pdf = FPDF(orientation='L', unit='mm', format='A4')
     pdf.add_page()
 
@@ -103,11 +107,17 @@ def export_df_to_pdf(df: pd.DataFrame, title: str, subtitle: str = "") -> bytes:
         pdf.set_text_color(0, 0, 0)
 
         pdf.set_font("Arial", size=7)
-        for _, row in df.iterrows():
-            for col_name, width, item in zip(col_names, col_widths, row):
+        premiere_ligne_recap = len(df) - recap_rows
+        for position, (_, row) in enumerate(df.iterrows()):
+            sans_bordure_jusqua = 0
+            if position >= premiere_ligne_recap:
+                sans_bordure_jusqua = next(
+                    (i for i, val in enumerate(row) if str(val).strip()), len(row)
+                )
+            for index, (col_name, width, item) in enumerate(zip(col_names, col_widths, row)):
                 formatted = _format_cell(item, col_name, _PLAIN_INT_COLS)
                 cell_text = formatted.encode('latin-1', 'replace').decode('latin-1')[:50]
-                pdf.cell(width, 7, cell_text, border=1, align='C')
+                pdf.cell(width, 7, cell_text, border=0 if index < sans_bordure_jusqua else 1, align='C')
             pdf.ln()
 
     pdf_string = pdf.output(dest='S').encode('latin-1', 'replace')

@@ -65,3 +65,6 @@ SEUIL_RETOUR_BON: Final[float] = 3.0
 SEUIL_RETOUR_ALERTE: Final[float] = 8.0
 SEUIL_CONVERSION_BON: Final[float] = 50.0
 SEUIL_CONVERSION_ALERTE: Final[float] = 30.0
+
+# Les prix catalogue (AR_PrixVen) sont exprimés HT ; aucun taux de taxe n'est ingéré depuis Sage.
+TAUX_TVA: Final[float] = 20.0
