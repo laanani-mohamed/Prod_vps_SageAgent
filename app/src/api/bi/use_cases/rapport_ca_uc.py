@@ -45,9 +45,9 @@ def execute(req: RapportCARequest) -> RapportResponse:
     # ── Convertir en DataFrame Polars (attendu par business_logic) ───────────
     df = pl.from_dicts(rows, infer_schema_length=500)
 
-    # Ajouter la colonne do_totalht_f (float) attendue par les fonctions de groupement
+    # Ajouter la colonne do_totalttc_f (float) attendue par les fonctions de groupement
     df = df.with_columns(
-        safe_float_col(df, "do_totalht").alias("do_totalht_f")
+        safe_float_col(df, "do_totalttc").alias("do_totalttc_f")
     )
 
     # ── Groupement ───────────────────────────────────────────────────────────

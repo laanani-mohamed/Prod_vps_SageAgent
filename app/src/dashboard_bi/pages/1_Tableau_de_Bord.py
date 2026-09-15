@@ -116,7 +116,7 @@ with km1:
             value=to_m_str(ca),
             #delta=f"{pct_ca_val}% de l'objectif 25 MMAD",
             #delta_color="inverse",
-            help=f"CA HT des ventes cumulé depuis le début de l'année ({ytd_label}).",
+            help=f"CA TTC des ventes cumulé depuis le début de l'année ({ytd_label}).",
         )
         st.html(
             f"""
@@ -137,7 +137,7 @@ with km2:
         st.metric(
             label=f"Chiffre d'Affaires ({year_n_1})",
             value=to_m_str(ca_n_1),
-            help=f"CA HT des ventes comparé à la même période en {year_n_1}.",
+            help=f"CA TTC des ventes comparé à la même période en {year_n_1}.",
         )
         st.html(
             f"""
@@ -319,10 +319,10 @@ with tab1:
                 )
             if top_cl:
                 df_top = pd.DataFrame(top_cl)
-                rename_map = {"ct_intitule": "Nom Client", "ca_ht": "CA HT (MAD)"}
+                rename_map = {"ct_intitule": "Nom Client", "ca_ttc": "CA TTC (MAD)"}
                 df_top_show = df_top[[c for c in rename_map.keys() if c in df_top.columns]].rename(columns=rename_map)
-                if "CA HT (MAD)" in df_top_show.columns:
-                    df_top_show["CA HT (MAD)"] = df_top_show["CA HT (MAD)"].apply(lambda x: f"{x:,.2f}")
+                if "CA TTC (MAD)" in df_top_show.columns:
+                    df_top_show["CA TTC (MAD)"] = df_top_show["CA TTC (MAD)"].apply(lambda x: f"{x:,.2f}")
                 show_df(df_top_show, key_suffix="top_clients_1")
             else:
                 st.info("Aucune vente enregistrée pour cette période.")

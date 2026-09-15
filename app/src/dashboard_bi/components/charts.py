@@ -19,11 +19,11 @@ def render_ca_evolution_chart(ca_monthly: List[Dict[str, Any]], height: int = 30
     fig.add_trace(go.Bar(
         x=mois,
         y=ca,
-        name="CA HT",
+        name="CA TTC",
         marker_color="#10b981",
         text=[f"{v:,.0f}" for v in ca],
         textposition="outside",
-        hovertemplate="<b>%{x}</b><br>CA HT : %{y:,.0f} DH<extra></extra>",
+        hovertemplate="<b>%{x}</b><br>CA TTC : %{y:,.0f} DH<extra></extra>",
     ))
 
     fig.update_layout(
@@ -46,7 +46,7 @@ def render_top_clients_chart(data: List[Dict[str, Any]], height: int = 300) -> N
         return
 
     labels = [r.get("ct_intitule") or r.get("do_tiers", "?") for r in data[:10]]
-    values = [r.get("ca_ht", 0) for r in data[:10]]
+    values = [r.get("ca_ttc", 0) for r in data[:10]]
 
     fig = go.Figure(go.Bar(
         x=values,

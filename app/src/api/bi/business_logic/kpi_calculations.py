@@ -41,18 +41,18 @@ def prepare_docentete(df_raw: pl.DataFrame) -> pl.DataFrame:
 
 
 def calc_chiffre_affaires(df_e: pl.DataFrame, date_from: Optional[str], date_to: Optional[str]) -> float:
-    """Calcule le CA HT sur les factures vente (do_type=6, do_domaine=0) avec filtre période."""
+    """Calcule le CA TTC sur les factures vente (do_type=6, do_domaine=0) avec filtre période."""
     df = df_e
     if date_from:
         df = df.filter(pl.col("do_date").cast(pl.Utf8) >= date_from)
     if date_to:
         df = df.filter(pl.col("do_date").cast(pl.Utf8) <= date_to)
     df_ca = df.filter((pl.col("do_domaine") == 0) & pl.col("do_type").is_in([6, 7]))
-    return float(df_ca["do_totalht_f"].sum() or 0)
+    return float(df_ca["do_totalttc_f"].sum() or 0)
 
 
 def calc_ca_n_minus_1(df_e_unfiltered: pl.DataFrame, date_from: str, date_to: str) -> float:
-    """Calcule le CA HT de la même période un an en arrière."""
+    """Calcule le CA TTC de la même période un an en arrière."""
     from datetime import datetime
 
     def subtract_one_year(dt):
@@ -73,7 +73,7 @@ def calc_ca_n_minus_1(df_e_unfiltered: pl.DataFrame, date_from: str, date_to: st
             (pl.col("do_date").cast(pl.Utf8) >= d_from_n1) &
             (pl.col("do_date").cast(pl.Utf8) <= d_to_n1)
         )
-        return float(df_ca_n1["do_totalht_f"].sum() or 0)
+        return float(df_ca_n1["do_totalttc_f"].sum() or 0)
     except Exception as e:
         logger.warning("[BI] Erreur calcul CA N-1 : %s", e)
         return 0.0
@@ -92,7 +92,7 @@ def calc_evolution_mensuelle(df_e: pl.DataFrame, date_from: Optional[str], date_
         df_monthly = df_ca.with_columns(
             pl.col("do_date").cast(pl.Utf8).str.slice(0, 7).alias("mois")
         ).group_by("mois").agg(
-            pl.col("do_totalht_f").sum().alias("ca")
+            pl.col("do_totalttc_f").sum().alias("ca")
         ).sort("mois", descending=False).tail(6)
 
         return [

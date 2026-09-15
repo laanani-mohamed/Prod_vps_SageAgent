@@ -259,11 +259,11 @@ with tab1:
                 
                 # Format columns based on grouping — only rename columns that exist
                 if grouping == "client":
-                    rename_map = {"do_tiers": "Code Client", "ct_intitule": "Nom Client", "ca_ht": "CA HT", "nb_factures": "Nb Factures"}
+                    rename_map = {"do_tiers": "Code Client", "ct_intitule": "Nom Client", "ca_ttc": "CA TTC", "nb_factures": "Nb Factures"}
                 elif grouping == "region":
-                    rename_map = {"ct_ville": "Région", "ca_ht": "CA HT", "nb_factures": "Nb Factures"}
+                    rename_map = {"ct_ville": "Région", "ca_ttc": "CA TTC", "nb_factures": "Nb Factures"}
                 elif grouping == "commercial":
-                    rename_map = {"co_no": "Code Collab.", "co_fullname": "Collaborateur", "ca_ht": "CA HT", "nb_factures": "Nb Factures"}
+                    rename_map = {"co_no": "Code Collab.", "co_fullname": "Collaborateur", "ca_ttc": "CA TTC", "nb_factures": "Nb Factures"}
                 else:
                     rename_map = {}
                 rename_map = {k: v for k, v in rename_map.items() if k in df.columns}
@@ -304,17 +304,17 @@ with tab1:
             )
             
         st.markdown("---")
-        total_ca = df_t1["CA HT"].sum() if "CA HT" in df_t1.columns else 0.0
+        total_ca = df_t1["CA TTC"].sum() if "CA TTC" in df_t1.columns else 0.0
         g_name = "Clients" if grp == "client" else ("Régions" if grp == "region" else "Collaborateurs")
-        
+
         df_t1_sums = pd.DataFrame([{
             f"Nombre de {g_name}": len(df_t1),
-            "CA HT Total": total_ca
+            "CA TTC Total": total_ca
         }])
-        
+
         st.markdown(f"**Chiffre d'Affaire en Général :**")
         st.dataframe(df_t1_sums.style.format({
-            "CA HT Total": "{:,.2f}"
+            "CA TTC Total": "{:,.2f}"
         }))
         
         st.markdown("**Chiffre d'Affaire en Détail :**")
@@ -370,8 +370,8 @@ with tab2:
             if not df1.empty and not df2.empty:
                 join_keys = [k for k in join_keys if k in df1.columns and k in df2.columns]
 
-            if df1.empty: df1 = pd.DataFrame(columns=join_keys + ["ca_ht"])
-            if df2.empty: df2 = pd.DataFrame(columns=join_keys + ["ca_ht"])
+            if df1.empty: df1 = pd.DataFrame(columns=join_keys + ["ca_ttc"])
+            if df2.empty: df2 = pd.DataFrame(columns=join_keys + ["ca_ttc"])
 
             df_merged = pd.merge(df1, df2, on=join_keys, how="outer", suffixes=('_p1', '_p2'))
             
@@ -386,19 +386,19 @@ with tab2:
                 col_name_mapping['ct_intitule'] = 'Nom Client'
                 
             df_merged = df_merged.fillna(0)
-            df_merged['Ecart (MAD)'] = df_merged['ca_ht_p2'] - df_merged['ca_ht_p1']
-            
+            df_merged['Ecart (MAD)'] = df_merged['ca_ttc_p2'] - df_merged['ca_ttc_p1']
+
             def calc_pct(row):
-                if row['ca_ht_p1'] == 0 and row['ca_ht_p2'] > 0: return 100.0
-                if row['ca_ht_p1'] == 0 and row['ca_ht_p2'] == 0: return 0.0
-                return (row['Ecart (MAD)'] / row['ca_ht_p1']) * 100
-                
+                if row['ca_ttc_p1'] == 0 and row['ca_ttc_p2'] > 0: return 100.0
+                if row['ca_ttc_p1'] == 0 and row['ca_ttc_p2'] == 0: return 0.0
+                return (row['Ecart (MAD)'] / row['ca_ttc_p1']) * 100
+
             df_merged['Evolution (%)'] = df_merged.apply(calc_pct, axis=1)
-            
+
             rename_dict = col_name_mapping.copy()
             rename_dict.update({
-                "ca_ht_p1": "CA Période 1",
-                "ca_ht_p2": "CA Période 2"
+                "ca_ttc_p1": "CA Période 1",
+                "ca_ttc_p2": "CA Période 2"
             })
             df_show = df_merged.rename(columns=rename_dict)
             
@@ -486,32 +486,39 @@ with tab2:
 # ---------------------------------------------------------------------------
 with tab3:
     st.subheader("Balance par Clients")
-    
+
     col_btn1, col_btn2, col_btn3 = st.columns([2, 1, 1])
     with col_btn1:
-        bal_clicked = st.button("Afficher la Balance", type="primary", key="btn_balance")
-        
+        bal_clicked = st.button("🔄 Actualiser la Balance", key="btn_balance")
+
     if bal_clicked:
-        with st.spinner("Génération de la balance..."):
-            data = fetch_balance_client()
-            if data:
-                df = pd.DataFrame(data)
-                
-                # Remplacer 'Non identifier' si nécessaire
-                if 'Nom Client' in df.columns:
-                    df['Nom Client'] = df['Nom Client'].replace({0: "Non Identifier", "0": "Non Identifier", "": "Non Identifier"})
-                
-                # S'assurer de l'ordre des colonnes
-                desired_cols = ["Ref Client", "Nom Client", "A Nouveau", "M6", "M5", "M4", "M3", "M2", "M1", "En Cours", "Totale"]
-                available_cols = [c for c in desired_cols if c in df.columns]
-                df_show = df[available_cols]
-                
-                st.session_state['df_tab3'] = df_show
-            else:
-                st.session_state['df_tab3'] = pd.DataFrame()
-                st.info("Aucune donnée de balance trouvée.")
+        fetch_balance_client.clear()
+
+    with st.spinner("Génération de la balance..."):
+        data = fetch_balance_client()
+        if data:
+            df = pd.DataFrame(data)
+
+            # Remplacer 'Non identifier' si nécessaire
+            if 'Nom Client' in df.columns:
+                df['Nom Client'] = df['Nom Client'].replace({0: "Non Identifier", "0": "Non Identifier", "": "Non Identifier"})
+
+            # S'assurer de l'ordre des colonnes : identifiants, puis mois (dans l'ordre renvoyé
+            # par l'API, du plus ancien au plus récent), puis les totaux
+            fixed_debut = ["Ref Client", "Nom Client", "A Nouveau"]
+            fixed_fin = ["En Cours", "Totale"]
+            mois_cols = [c for c in df.columns if c not in fixed_debut + fixed_fin]
+            available_cols = [c for c in fixed_debut + mois_cols + fixed_fin if c in df.columns]
+            df_show = df[available_cols]
+
+            st.session_state['df_tab3'] = df_show
+        else:
+            st.session_state['df_tab3'] = pd.DataFrame()
 
     df_t3 = st.session_state.get('df_tab3')
+    if df_t3 is None or df_t3.empty:
+        st.info("Aucune donnée de balance trouvée.")
+
     if df_t3 is not None and not df_t3.empty:
         with col_btn2:
             st.download_button(
@@ -534,8 +541,8 @@ with tab3:
                 mime="application/pdf"
             )
             
-        # Format columns dynamically
-        numeric_cols = ["A Nouveau", "M6", "M5", "M4", "M3", "M2", "M1", "En Cours", "Totale"]
+        # Format columns dynamically (toutes sauf les identifiants sont numériques)
+        numeric_cols = [c for c in df_t3.columns if c not in ("Ref Client", "Nom Client")]
         format_dict = {col: "{:,.2f}" for col in numeric_cols if col in df_t3.columns}
         
         st.markdown("**la balance générale :**")
@@ -693,68 +700,93 @@ with tab5:
     clients_list = _load_clients()
     client_options = {f"{code} — {nom}": code for code, nom in clients_list}
 
-    col_sel, col_btn_gen = st.columns([3, 1])
-    with col_sel:
-        selected_label = st.selectbox(
-            "Sélectionner un client",
-            options=list(client_options.keys()),
-            key="visite_client_select",
-            placeholder="Rechercher par ref ou nom…",
-        )
-    with col_btn_gen:
-        st.markdown("<br>", unsafe_allow_html=True)
-        visite_clicked = st.button("Générer le rapport", type="primary", key="btn_visite")
+    selected_label = st.selectbox(
+        "Sélectionner un client",
+        options=list(client_options.keys()),
+        index=None,
+        key="visite_client_select",
+        placeholder="Rechercher par ref ou nom…",
+    )
 
-    if visite_clicked and selected_label:
-        do_tiers = client_options[selected_label]
+    @st.cache_data(ttl=300, show_spinner=False)
+    def _fetch_visite_client(schema: str, do_tiers: str):
         payload = {
-            "client_schema": client_schema,
+            "client_schema": schema,
             "source_type": "db_latest",
             "do_tiers": do_tiers,
         }
+        r = httpx.post(
+            f"{API_BASE_URL}/api/bi/rapport/visite-client",
+            json=payload,
+            headers=headers,
+            timeout=30.0,
+        )
+        if r.status_code == 200:
+            return r.json().get("data", [{}])[0]
+        raise RuntimeError(f"Erreur API {r.status_code} : {r.text}")
+
+    visite_data = None
+    if selected_label:
+        do_tiers = client_options[selected_label]
         try:
             with st.spinner("Génération du rapport avant visite…"):
-                r = httpx.post(
-                    f"{API_BASE_URL}/api/bi/rapport/visite-client",
-                    json=payload,
-                    headers=headers,
-                    timeout=30.0,
-                )
-            if r.status_code == 200:
-                data_visite = r.json().get("data", [{}])[0]
-                st.session_state["visite_data"]   = data_visite
-                st.session_state["visite_client"] = selected_label
-                st.session_state["visite_tiers"]  = do_tiers
-            else:
-                st.error(f"Erreur API {r.status_code} : {r.text}")
-                st.session_state["visite_data"] = None
+                visite_data = _fetch_visite_client(client_schema, do_tiers)
         except Exception as e:
             handle_auth_error(e)
-            st.session_state["visite_data"] = None
+            st.error(str(e))
 
     # ── Affichage du rapport ─────────────────────────────────────────────────
-    visite_data   = st.session_state.get("visite_data")
-    visite_client = st.session_state.get("visite_client", "")
-    visite_tiers  = st.session_state.get("visite_tiers",  "")
-
     if visite_data:
+        visite_client = selected_label
+        visite_tiers = client_options[selected_label]
         st.markdown(f"### 📋 Client : {visite_client}")
         subtitle_visite = f"Client : {visite_tiers} — Généré le {date.today().isoformat()}"
 
         # Construire tous les DataFrames pour l'export groupé
         _dfs_export = {}
 
+        def _build_section(key: str) -> pd.DataFrame:
+            rows = visite_data.get(key, [])
+            return pd.DataFrame(rows) if rows else pd.DataFrame()
+
+        section_keys = [
+            "bc_en_cours", "factures_non_reglees", "articles_par_mois",
+            "familles_actives", "familles_dormantes", "familles_mortes",
+        ]
+        for key in section_keys:
+            _dfs_export[key] = _build_section(key)
+
+        rows_ca = visite_data.get("comparaison_ca", [])
+        _dfs_export["comparaison_ca"] = pd.DataFrame(rows_ca) if rows_ca else pd.DataFrame()
+
+        # ── Exports (en haut) ──────────────────────────────────────────────
+        section_labels = {
+            "bc_en_cours":          "1-BCs en cours",
+            "factures_non_reglees": "2-Factures impayées",
+            "articles_par_mois":    "3-Articles par mois",
+            "familles_actives":     "4-Familles actives",
+            "familles_dormantes":   "5-Familles dormantes",
+            "familles_mortes":      "6-Familles mortes",
+            "comparaison_ca":       "7-Comparaison CA",
+        }
+        sections = [(label, _dfs_export.get(key, pd.DataFrame())) for key, label in section_labels.items()]
+
+        render_multi_export_buttons(
+            sections,
+            filename_base=f"Rapport_Visite_{visite_tiers}_{date.today().isoformat()}",
+            pdf_title=f"Rapport Avant Visite - {visite_client}",
+            pdf_subtitle=subtitle_visite,
+        )
+        st.markdown("---")
+
         def _show_section(title: str, key: str, numeric_cols: list = None):
             st.markdown(f"#### {title}")
-            rows = visite_data.get(key, [])
-            df = pd.DataFrame(rows) if rows else pd.DataFrame()
+            df = _dfs_export[key]
             if df.empty:
                 st.info("Aucune donnée.")
             else:
                 fmt = {c: "{:,.2f}" for c in (numeric_cols or []) if c in df.columns}
                 st.dataframe(df.style.format(fmt) if fmt else df, use_container_width=True)
-            _dfs_export[key] = df
-            return df
 
         _show_section("1. Bons de Commande en Cours",     "bc_en_cours",
                        ["Montant HT", "Montant TTC"])
@@ -776,37 +808,15 @@ with tab5:
 
         # Section 7 — Comparaison CA
         st.markdown("#### 7. Comparaison CA (N vs N-1) — 6 mois glissants")
-        rows_ca = visite_data.get("comparaison_ca", [])
-        if rows_ca:
-            df_ca = pd.DataFrame(rows_ca)
+        df_ca = _dfs_export["comparaison_ca"]
+        if not df_ca.empty:
             num_cols_ca = [c for c in df_ca.columns if c != "Période"]
             st.dataframe(df_ca.style.format({c: "{:,.2f}" for c in num_cols_ca}),
                          use_container_width=True)
-            _dfs_export["comparaison_ca"] = df_ca
         else:
             st.info("Aucune donnée de comparaison CA.")
-            _dfs_export["comparaison_ca"] = pd.DataFrame()
-
-        # ── Exports ─────────────────────────────────────────────────────────
-        st.markdown("---")
-
-        section_labels = {
-            "bc_en_cours":          "1-BCs en cours",
-            "factures_non_reglees": "2-Factures impayées",
-            "articles_par_mois":    "3-Articles par mois",
-            "familles_actives":     "4-Familles actives",
-            "familles_dormantes":   "5-Familles dormantes",
-            "familles_mortes":      "6-Familles mortes",
-            "comparaison_ca":       "7-Comparaison CA",
-        }
-        sections = [(label, _dfs_export.get(key, pd.DataFrame())) for key, label in section_labels.items()]
-
-        render_multi_export_buttons(
-            sections,
-            filename_base=f"Rapport_Visite_{visite_tiers}_{date.today().isoformat()}",
-            pdf_title=f"Rapport Avant Visite - {visite_client}",
-            pdf_subtitle=subtitle_visite,
-        )
+    elif selected_label is None:
+        st.info("Sélectionnez un client pour générer le rapport.")
 
 # ---------------------------------------------------------------------------
 # Tab 6 : Produits Dormants
@@ -814,73 +824,75 @@ with tab5:
 with tab6:
     st.subheader("Produits Dormants")
 
-    col_d, col_gen = st.columns([1, 1])
+    col_d, col_gen = st.columns([3, 1])
     with col_d:
         dormant_months = st.number_input("Mois d'inactivité", min_value=1, max_value=24, value=6, step=1, key="rpt_dormant_months")
     with col_gen:
         st.markdown("<br>", unsafe_allow_html=True)
-        dormant_clicked = st.button("Générer", type="primary", key="btn_dormant_report")
+        dormant_refresh = st.button("🔄 Actualiser", key="btn_dormant_report")
 
-    if dormant_clicked:
-        dormant_days = dormant_months * 30
-        with st.spinner("Chargement des produits dormants..."):
-            data_dormant = get_stock_insights(client_schema, category="dormant", limit=100000000, dormant_days=dormant_days)
+    @st.cache_data(ttl=600, show_spinner=False)
+    def _fetch_dormants(schema: str, dormant_days: int):
+        return get_stock_insights(schema, category="dormant", limit=100000000, dormant_days=dormant_days)
 
-        _rename_dormant = {
-            "ar_ref": "Réf. Article", "ar_design": "Désignation",
-            "fa_intitule": "Famille", "de_intitule": "Dépôt",
-            "quantite_totale": "Qté Totale",
-            "prix_achat": "Prix Achat",
-            "valeur_stock": "Valeur Stock",
-            "derniere_date_vente": "Dernière Vente",
-            "nbr_jours_inactif": "Mois Inactivité",
-        }
+    if dormant_refresh:
+        _fetch_dormants.clear()
 
-        if not data_dormant:
-            df_dormant = pd.DataFrame()
-        else:
-            df_dormant = pd.DataFrame(data_dormant)
-            df_dormant = df_dormant.rename(columns={k: v for k, v in _rename_dormant.items() if k in df_dormant.columns})
-            cols = [v for v in _rename_dormant.values() if v in df_dormant.columns]
-            df_dormant = df_dormant[cols] if cols else df_dormant
+    dormant_days = dormant_months * 30
+    with st.spinner("Chargement des produits dormants..."):
+        data_dormant = _fetch_dormants(client_schema, dormant_days)
 
-            if "Prix Achat" in df_dormant.columns:
-                df_dormant["Prix Achat"] = pd.to_numeric(df_dormant["Prix Achat"], errors="coerce").fillna(0.0)
-            if "Valeur Stock" in df_dormant.columns:
-                df_dormant["Valeur Stock"] = pd.to_numeric(df_dormant["Valeur Stock"], errors="coerce").fillna(0.0)
-            if "Qté Totale" in df_dormant.columns:
-                df_dormant["Qté Totale"] = pd.to_numeric(df_dormant["Qté Totale"], errors="coerce").fillna(0.0)
-            if "Dernière Vente" in df_dormant.columns:
-                df_dormant["Dernière Vente"] = pd.to_datetime(df_dormant["Dernière Vente"], errors="coerce").dt.strftime("%d/%m/%Y").fillna("-")
-            if "Mois Inactivité" in df_dormant.columns:
-                df_dormant["Mois Inactivité"] = df_dormant["Mois Inactivité"].apply(
-                    lambda x: "Jamais vendu" if pd.isna(x) or x == 999999 else f"{round(float(x) / 30)} mois"
-                )
+    _rename_dormant = {
+        "ar_ref": "Réf. Article", "ar_design": "Désignation",
+        "fa_intitule": "Famille", "de_intitule": "Dépôt",
+        "quantite_totale": "Qté Totale",
+        "prix_achat": "Prix Achat",
+        "valeur_stock": "Valeur Stock",
+        "derniere_date_vente": "Dernière Vente",
+        "nbr_jours_inactif": "Mois Inactivité",
+    }
 
-        st.session_state["dormant_df"] = df_dormant
-        st.session_state["dormant_months"] = dormant_months
+    if not data_dormant:
+        df_dormant = pd.DataFrame()
+    else:
+        df_dormant = pd.DataFrame(data_dormant)
+        df_dormant = df_dormant.rename(columns={k: v for k, v in _rename_dormant.items() if k in df_dormant.columns})
+        cols = [v for v in _rename_dormant.values() if v in df_dormant.columns]
+        df_dormant = df_dormant[cols] if cols else df_dormant
 
-    df_dormant = st.session_state.get("dormant_df")
-    d_months = st.session_state.get("dormant_months", 6)
-    if df_dormant is not None:
-        st.markdown(f"#### Produits inactifs depuis plus de {d_months} mois")
-        if df_dormant.empty:
-            st.success("Aucun produit dormant détecté ! 🎉")
-        else:
-            if "Valeur Stock" in df_dormant.columns:
-                df_dormant_display = df_dormant.copy()
-                df_dormant_display["Valeur Stock"] = pd.to_numeric(df_dormant_display["Valeur Stock"], errors="coerce").fillna(0.0)
-                st.dataframe(df_dormant_display.style.format({"Valeur Stock": "{:,.2f}"}), use_container_width=True)
-            else:
-                st.dataframe(df_dormant, use_container_width=True)
-
-            render_export_buttons(
-                df_dormant,
-                filename_base=f"Dormants_{d_months}mois_{date.today().isoformat()}",
-                pdf_section_title=f"Produits Dormants (inactifs > {d_months} mois)",
-                pdf_title="Rapport Produits Dormants",
-                pdf_subtitle=f"Inactivite > {d_months} mois",
+        if "Prix Achat" in df_dormant.columns:
+            df_dormant["Prix Achat"] = pd.to_numeric(df_dormant["Prix Achat"], errors="coerce").fillna(0.0)
+        if "Valeur Stock" in df_dormant.columns:
+            df_dormant["Valeur Stock"] = pd.to_numeric(df_dormant["Valeur Stock"], errors="coerce").fillna(0.0)
+        if "Qté Totale" in df_dormant.columns:
+            df_dormant["Qté Totale"] = pd.to_numeric(df_dormant["Qté Totale"], errors="coerce").fillna(0.0)
+        if "Dernière Vente" in df_dormant.columns:
+            df_dormant["Dernière Vente"] = pd.to_datetime(df_dormant["Dernière Vente"], errors="coerce").dt.strftime("%d/%m/%Y").fillna("-")
+        if "Mois Inactivité" in df_dormant.columns:
+            df_dormant["Mois Inactivité"] = df_dormant["Mois Inactivité"].apply(
+                lambda x: "Jamais vendu" if pd.isna(x) or x == 999999 else f"{round(float(x) / 30)} mois"
             )
+
+    d_months = dormant_months
+    st.markdown(f"#### Produits inactifs depuis plus de {d_months} mois")
+    if df_dormant.empty:
+        st.success("Aucun produit dormant détecté ! 🎉")
+    else:
+        render_export_buttons(
+            df_dormant,
+            filename_base=f"Dormants_{d_months}mois_{date.today().isoformat()}",
+            pdf_section_title=f"Produits Dormants (inactifs > {d_months} mois)",
+            pdf_title="Rapport Produits Dormants",
+            pdf_subtitle=f"Inactivite > {d_months} mois",
+        )
+        st.markdown("---")
+
+        if "Valeur Stock" in df_dormant.columns:
+            df_dormant_display = df_dormant.copy()
+            df_dormant_display["Valeur Stock"] = pd.to_numeric(df_dormant_display["Valeur Stock"], errors="coerce").fillna(0.0)
+            st.dataframe(df_dormant_display.style.format({"Valeur Stock": "{:,.2f}"}), use_container_width=True)
+        else:
+            st.dataframe(df_dormant, use_container_width=True)
 
 # ---------------------------------------------------------------------------
 # Tab 7 : Lots en Péremption
@@ -888,51 +900,52 @@ with tab6:
 with tab7:
     st.subheader("Lots en Péremption")
 
-    col_p, col_gen = st.columns([1, 1])
+    col_p, col_gen = st.columns([3, 1])
     with col_p:
         expiry_days_rpt = st.number_input("Jours avant péremption", min_value=1, value=60, step=10, key="rpt_expiry_days")
     with col_gen:
         st.markdown("<br>", unsafe_allow_html=True)
-        perempt_clicked = st.button("Générer", type="primary", key="btn_perempt_report")
+        perempt_refresh = st.button("🔄 Actualiser", key="btn_perempt_report")
 
-    if perempt_clicked:
-        with st.spinner("Chargement des lots en péremption..."):
-            data_perempt = get_stock_insights(client_schema, category="peremption", limit=100000000, expiry_days=expiry_days_rpt)
+    @st.cache_data(ttl=600, show_spinner=False)
+    def _fetch_peremption(schema: str, expiry_days: int):
+        return get_stock_insights(schema, category="peremption", limit=100000000, expiry_days=expiry_days)
 
-        _rename_perempt = {
-            "ar_ref": "Réf. Article", "ar_design": "Désignation",
-            "fa_intitule": "Famille",
-            "ls_noserie": "N° Lot/Série", "ls_qterestant": "Qté Restante",
-            "ls_peremption": "Date Péremption", "jours_restants": "Jours Restants",
-        }
+    if perempt_refresh:
+        _fetch_peremption.clear()
 
-        if not data_perempt:
-            df_perempt = pd.DataFrame()
-        else:
-            df_perempt = pd.DataFrame(data_perempt)
-            df_perempt = df_perempt.rename(columns={k: v for k, v in _rename_perempt.items() if k in df_perempt.columns})
-            cols = [v for v in _rename_perempt.values() if v in df_perempt.columns]
-            df_perempt = df_perempt[cols] if cols else df_perempt
+    with st.spinner("Chargement des lots en péremption..."):
+        data_perempt = _fetch_peremption(client_schema, expiry_days_rpt)
 
-        st.session_state["perempt_df"] = df_perempt
-        st.session_state["perempt_days"] = expiry_days_rpt
+    _rename_perempt = {
+        "ar_ref": "Réf. Article", "ar_design": "Désignation",
+        "fa_intitule": "Famille",
+        "ls_noserie": "N° Lot/Série", "ls_qterestant": "Qté Restante",
+        "ls_peremption": "Date Péremption", "jours_restants": "Jours Restants",
+    }
 
-    df_perempt = st.session_state.get("perempt_df")
-    e_days = st.session_state.get("perempt_days", 60)
-    if df_perempt is not None:
-        st.markdown(f"#### Lots expirant dans les {e_days} prochains jours")
-        if df_perempt.empty:
-            st.success("Aucun lot en péremption détecté ! 🎉")
-        else:
-            st.dataframe(df_perempt, use_container_width=True)
+    if not data_perempt:
+        df_perempt = pd.DataFrame()
+    else:
+        df_perempt = pd.DataFrame(data_perempt)
+        df_perempt = df_perempt.rename(columns={k: v for k, v in _rename_perempt.items() if k in df_perempt.columns})
+        cols = [v for v in _rename_perempt.values() if v in df_perempt.columns]
+        df_perempt = df_perempt[cols] if cols else df_perempt
 
-            render_export_buttons(
-                df_perempt,
-                filename_base=f"Peremption_{e_days}j_{date.today().isoformat()}",
-                pdf_section_title=f"Lots en Peremption (< {e_days} jours)",
-                pdf_title="Rapport Lots en Peremption",
-                pdf_subtitle=f"Expiration dans les {e_days} prochains jours",
-            )
+    e_days = expiry_days_rpt
+    st.markdown(f"#### Lots expirant dans les {e_days} prochains jours")
+    if df_perempt.empty:
+        st.success("Aucun lot en péremption détecté ! 🎉")
+    else:
+        render_export_buttons(
+            df_perempt,
+            filename_base=f"Peremption_{e_days}j_{date.today().isoformat()}",
+            pdf_section_title=f"Lots en Peremption (< {e_days} jours)",
+            pdf_title="Rapport Lots en Peremption",
+            pdf_subtitle=f"Expiration dans les {e_days} prochains jours",
+        )
+        st.markdown("---")
+        st.dataframe(df_perempt, use_container_width=True)
 
 # ---------------------------------------------------------------------------
 # Tab 8 : Consommation par Produit
@@ -940,17 +953,27 @@ with tab7:
 with tab8:
     st.subheader("Gestion de Consommation des Articles par Produits")
 
-    conso_clicked = st.button("Générer", type="primary", key="btn_consommation")
-
+    conso_clicked = st.button("🔄 Actualiser", key="btn_consommation")
     if conso_clicked:
-        with st.spinner("Chargement de la consommation..."):
-            conso_data = fetch_consommation()
-        st.session_state["conso_data"] = conso_data
+        fetch_consommation.clear()
+
+    with st.spinner("Chargement de la consommation..."):
+        conso_data = fetch_consommation()
+    st.session_state["conso_data"] = conso_data
 
     conso_data = st.session_state.get("conso_data")
     if conso_data:
         df_famille = pd.DataFrame(conso_data.get("par_famille", []))
         df_article = pd.DataFrame(conso_data.get("par_article", []))
+
+        if not df_famille.empty or not df_article.empty:
+            render_multi_export_buttons(
+                [("Recap par Famille", df_famille), ("Detail par Article", df_article)],
+                filename_base=f"Consommation_{date.today().isoformat()}",
+                pdf_title="Rapport Consommation par Produit",
+                pdf_subtitle=f"6 derniers mois — Généré le {date.today().isoformat()}",
+            )
+            st.markdown("---")
 
         st.markdown("#### Récapitulatif par Famille")
         if df_famille.empty:
@@ -972,45 +995,47 @@ with tab8:
                 use_container_width=True,
             )
 
-        if not df_famille.empty or not df_article.empty:
-            st.markdown("---")
-            render_multi_export_buttons(
-                [("Recap par Famille", df_famille), ("Detail par Article", df_article)],
-                filename_base=f"Consommation_{date.today().isoformat()}",
-                pdf_title="Rapport Consommation par Produit",
-                pdf_subtitle=f"6 derniers mois — Généré le {date.today().isoformat()}",
-            )
-
 # ---------------------------------------------------------------------------
 # Tab 9 : Balance Âgée
 # ---------------------------------------------------------------------------
 with tab9:
     st.subheader("Balance Âgée par Clients")
 
-    agee_clicked = st.button("Afficher la Balance Âgée", type="primary", key="btn_balance_agee")
-
+    agee_clicked = st.button("🔄 Actualiser la Balance Âgée", key="btn_balance_agee")
     if agee_clicked:
-        with st.spinner("Génération de la balance âgée..."):
-            data = fetch_balance_agee()
-            if data:
-                df = pd.DataFrame(data)
+        fetch_balance_agee.clear()
 
-                if 'Nom Client' in df.columns:
-                    df['Nom Client'] = df['Nom Client'].replace({0: "Non Identifier", "0": "Non Identifier", "": "Non Identifier"})
+    with st.spinner("Génération de la balance âgée..."):
+        data = fetch_balance_agee()
+        if data:
+            df = pd.DataFrame(data)
 
-                desired_cols = ["Ref Client", "Nom Client", "0-60j", "60-90j", "90-120j", "+120j", "Totale"]
-                available_cols = [c for c in desired_cols if c in df.columns]
-                df_show = df[available_cols]
+            if 'Nom Client' in df.columns:
+                df['Nom Client'] = df['Nom Client'].replace({0: "Non Identifier", "0": "Non Identifier", "": "Non Identifier"})
 
-                st.session_state['df_tab9'] = df_show
-            else:
-                st.session_state['df_tab9'] = pd.DataFrame()
-                st.info("Aucune donnée de balance âgée trouvée.")
+            desired_cols = ["Ref Client", "Nom Client", "0-60j", "60-90j", "90-120j", "+120j", "Totale"]
+            available_cols = [c for c in desired_cols if c in df.columns]
+            df_show = df[available_cols]
+
+            st.session_state['df_tab9'] = df_show
+        else:
+            st.session_state['df_tab9'] = pd.DataFrame()
 
     df_t9 = st.session_state.get('df_tab9')
+    if df_t9 is None or df_t9.empty:
+        st.info("Aucune donnée de balance âgée trouvée.")
+
     if df_t9 is not None and not df_t9.empty:
         numeric_cols = ["0-60j", "60-90j", "90-120j", "+120j", "Totale"]
         format_dict = {col: "{:,.2f}" for col in numeric_cols if col in df_t9.columns}
+
+        render_export_buttons(
+            df_t9,
+            filename_base=f"Balance_Agee_{date.today().isoformat()}",
+            pdf_section_title="Balance Âgée par Clients",
+            pdf_title="Rapport Balance Âgée",
+            pdf_subtitle=f"Généré le {date.today().isoformat()}",
+        )
 
         st.markdown("**Balance âgée générale :**")
         sums = df_t9[[c for c in numeric_cols if c in df_t9.columns]].sum()
@@ -1020,11 +1045,3 @@ with tab9:
 
         st.markdown("**Détail de la balance âgée :**")
         st.dataframe(df_t9.style.format(format_dict))
-
-        render_export_buttons(
-            df_t9,
-            filename_base=f"Balance_Agee_{date.today().isoformat()}",
-            pdf_section_title="Balance Âgée par Clients",
-            pdf_title="Rapport Balance Âgée",
-            pdf_subtitle=f"Généré le {date.today().isoformat()}",
-        )

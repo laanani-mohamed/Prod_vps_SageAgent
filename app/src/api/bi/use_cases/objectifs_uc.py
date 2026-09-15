@@ -59,7 +59,7 @@ def execute(client_schema: str) -> ObjectifsResponse:
             df_ca = df_ytd.filter(
                 (pl.col("do_domaine") == 0) & (pl.col("do_type").is_in([6, 7]))
             )
-            ca_mois = float(df_ca["do_totalht_f"].sum() or 0.0)
+            ca_mois = float(df_ca["do_totalttc_f"].sum() or 0.0)
 
             # ── Encours all-time ─────────────────────────────────────────────
             df_enc_base = df_e.filter(

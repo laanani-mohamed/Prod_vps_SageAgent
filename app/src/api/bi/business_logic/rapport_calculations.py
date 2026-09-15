@@ -39,7 +39,7 @@ def prepare_docentete_rapport(df_raw: pl.DataFrame) -> tuple[pl.DataFrame, bool]
     df = df_raw.with_columns([
         pl.col("do_domaine").cast(pl.Int64, strict=False),
         pl.col("do_type").cast(pl.Int64, strict=False),
-        safe_float_col(df_raw, "do_totalht").alias("do_totalht_f"),
+        safe_float_col(df_raw, "do_totalttc").alias("do_totalttc_f"),
     ])
     all_zero = detect_archive_mode(df)
     return df, all_zero
@@ -62,47 +62,47 @@ def apply_date_filters(df: pl.DataFrame, date_from: Optional[str], date_to: Opti
 
 
 def group_ca_par_mois(df: pl.DataFrame) -> List[Dict[str, Any]]:
-    """Groupe le CA HT par mois (YYYY-MM) trié chronologiquement."""
+    """Groupe le CA TTC par mois (YYYY-MM) trié chronologiquement."""
     result = df.with_columns(
         pl.col("do_date").cast(pl.Utf8).str.slice(0, 7).alias("mois")
     ).group_by("mois").agg(
-        pl.col("do_totalht_f").sum().alias("ca_ht"),
+        pl.col("do_totalttc_f").sum().alias("ca_ttc"),
         pl.col("do_piece").count().alias("nb_factures"),
     ).sort("mois")
     return result.to_dicts()
 
 
 def group_ca_par_client(df: pl.DataFrame) -> List[Dict[str, Any]]:
-    """Groupe le CA HT par client (do_tiers / ct_intitule), trié desc."""
+    """Groupe le CA TTC par client (do_tiers / ct_intitule), trié desc."""
     grp_col = "do_tiers"
     label_col = "ct_intitule" if "ct_intitule" in df.columns else "do_tiers"
     result = df.group_by([grp_col, label_col]).agg(
-        pl.col("do_totalht_f").sum().alias("ca_ht"),
+        pl.col("do_totalttc_f").sum().alias("ca_ttc"),
         pl.col("do_piece").count().alias("nb_factures"),
-    ).sort("ca_ht", descending=True)
+    ).sort("ca_ttc", descending=True)
     return result.to_dicts()
 
 
 def group_ca_par_commercial(df: pl.DataFrame) -> List[Dict[str, Any]]:
-    """Groupe le CA HT par commercial (co_no + co_fullname), trié desc."""
+    """Groupe le CA TTC par commercial (co_no + co_fullname), trié desc."""
     group_cols = ["co_no"]
     if "co_fullname" in df.columns:
         group_cols.append("co_fullname")
     result = df.group_by(group_cols).agg(
-        pl.col("do_totalht_f").sum().alias("ca_ht"),
+        pl.col("do_totalttc_f").sum().alias("ca_ttc"),
         pl.col("do_piece").count().alias("nb_factures"),
-    ).sort("ca_ht", descending=True)
+    ).sort("ca_ttc", descending=True)
     return result.to_dicts()
 
 
 def group_ca_par_region(df: pl.DataFrame) -> List[Dict[str, Any]]:
-    """Groupe le CA HT par region (ct_ville), trié desc."""
+    """Groupe le CA TTC par region (ct_ville), trié desc."""
     if "ct_ville" not in df.columns:
         return []
     result = df.group_by("ct_ville").agg(
-        pl.col("do_totalht_f").sum().alias("ca_ht"),
+        pl.col("do_totalttc_f").sum().alias("ca_ttc"),
         pl.col("do_piece").count().alias("nb_factures"),
-    ).sort("ca_ht", descending=True)
+    ).sort("ca_ttc", descending=True)
     return result.to_dicts()
 
 
@@ -139,13 +139,13 @@ def calc_top_clients_rapport(
     limit: int,
 ) -> List[Dict[str, Any]]:
     """
-    Calcule le top N clients par CA HT.
-    Retourne une liste de dicts : do_tiers, ct_intitule, ca_ht, nb_factures.
+    Calcule le top N clients par CA TTC.
+    Retourne une liste de dicts : do_tiers, ct_intitule, ca_ttc, nb_factures.
     """
     result = df.group_by("do_tiers").agg(
-        pl.col("do_totalht_f").sum().alias("ca_ht"),
+        pl.col("do_totalttc_f").sum().alias("ca_ttc"),
         pl.col("do_piece").count().alias("nb_factures"),
-    ).sort("ca_ht", descending=True)
+    ).sort("ca_ttc", descending=True)
 
     if df_tiers is not None:
         result = result.join(

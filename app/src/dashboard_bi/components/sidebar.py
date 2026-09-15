@@ -8,5 +8,6 @@ def render_sidebar():
     """Rendu de la sidebar globale."""
     apply_sidebar_css()
     with st.sidebar:
-        st.title("ITBORD")
+        client_schema = st.session_state.get("client_schema", "")
+        st.title(f"ITBORD-{client_schema}" if client_schema else "ITBORD")
         st.divider()

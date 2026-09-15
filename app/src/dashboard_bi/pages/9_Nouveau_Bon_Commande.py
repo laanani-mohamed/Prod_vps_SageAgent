@@ -142,28 +142,34 @@ else:
             "Stock": pd.to_numeric(df_articles["qte_stock_totale"], errors="coerce").fillna(0.0),
         })
 
-        st.caption("Sélectionnez un article puis ajoutez-le : la quantité se règle dans le tableau ci-dessous.")
+        st.caption("Cochez un ou plusieurs articles puis ajoutez-les d'un coup : la quantité se règle dans le tableau ci-dessous.")
         selection = show_df(
             df_affichage,
             on_select="rerun",
-            selection_mode="single-row",
+            selection_mode="multi-row",
             key_suffix="bc_articles",
         )
 
         lignes_selectionnees = selection.get("selection", {}).get("rows", [])
         if lignes_selectionnees:
-            article = df_affichage.iloc[lignes_selectionnees[0]]
-            if st.button(f"Ajouter « {article['Réf. Article']} »", type="primary"):
-                ref_ajout = article["Réf. Article"]
-                oublier_widgets_ligne(ref_ajout)
-                st.session_state.bc_lignes[ref_ajout] = {
-                    "famille": article["Famille"],
-                    "design": article["Désignation"],
-                    "pu": float(article["PU HT"]),
-                    "stock": float(article["Stock"]),
-                    "qte": 1.0,
-                    "remise_pct": 0.0,
-                }
+            articles_selectionnes = df_affichage.iloc[lignes_selectionnees]
+            libelle_bouton = (
+                f"Ajouter « {articles_selectionnes.iloc[0]['Réf. Article']} »"
+                if len(articles_selectionnes) == 1
+                else f"Ajouter les {len(articles_selectionnes)} articles sélectionnés"
+            )
+            if st.button(libelle_bouton, type="primary"):
+                for _, article in articles_selectionnes.iterrows():
+                    ref_ajout = article["Réf. Article"]
+                    oublier_widgets_ligne(ref_ajout)
+                    st.session_state.bc_lignes[ref_ajout] = {
+                        "famille": article["Famille"],
+                        "design": article["Désignation"],
+                        "pu": float(article["PU HT"]),
+                        "stock": float(article["Stock"]),
+                        "qte": 1.0,
+                        "remise_pct": 0.0,
+                    }
                 st.rerun()
 
 # ---------------------------------------------------------------------------
@@ -205,11 +211,29 @@ for colonne, libelle in zip(
 ):
     colonne.markdown(f"**{libelle}**")
 
-a_supprimer = []
-for ref, ligne in lignes.items():
-    c_sup, c_fam, c_ref, c_design, c_pu, c_max, c_qte, c_remise, c_montant = st.columns(
-        PROPORTIONS_PANIER, vertical_alignment="center"
+# La quantité saisie est lue en session avant de dessiner la ligne, pour colorer toute la ligne
+# dès la saisie. Les sélecteurs CSS reposent sur la position, jamais sur la référence article.
+positions_depassement = [
+    position
+    for position, (ref, ligne) in enumerate(lignes.items())
+    if float(st.session_state.get(f"bc_qte_{ref}", ligne["qte"])) > ligne["stock"]
+]
+if positions_depassement:
+    selecteurs = ", ".join(f".st-key-bc_ligne_{p}" for p in positions_depassement)
+    st.markdown(
+        f"""<style>
+{selecteurs} {{ background-color: rgba(229, 57, 53, 0.12); border-left: 4px solid #e53935;
+  border-radius: 6px; padding: 2px 6px; }}
+{", ".join(f".st-key-bc_ligne_{p} p" for p in positions_depassement)} {{ color: #c62828; font-weight: 600; }}
+</style>""",
+        unsafe_allow_html=True,
     )
+
+a_supprimer = []
+for position, (ref, ligne) in enumerate(lignes.items()):
+    c_sup, c_fam, c_ref, c_design, c_pu, c_max, c_qte, c_remise, c_montant = st.container(
+        key=f"bc_ligne_{position}"
+    ).columns(PROPORTIONS_PANIER, vertical_alignment="center")
     if c_sup.checkbox("Supprimer", key=f"bc_sup_{ref}", label_visibility="collapsed"):
         a_supprimer.append(ref)
 
@@ -252,56 +276,14 @@ col_remise.metric("Montant remisé", format_montant(montant_remise))
 col_ht.metric("Total HT", format_montant(total_ht))
 col_ttc.metric(f"Total TTC (TVA {TAUX_TVA:.0f} %)", format_montant(total_ttc))
 
-# ---------------------------------------------------------------------------
-# 4. Vérification des disponibilités
-# ---------------------------------------------------------------------------
-signature = tuple(sorted((ref, ligne["qte"]) for ref, ligne in lignes.items()))
-
-if st.button("Vérifier la disponibilité", type="primary"):
-    with st.spinner("Vérification du stock…"):
-        try:
-            stock = get_articles(
-                client_schema,
-                limit=len(lignes),
-                filters={"ar_ref_exact": list(lignes), "with_stock": True},
-            )
-        except Exception as e:
-            handle_auth_error(e)
-            stock = []
-
-    dispo = {
-        str(row.get("ar_ref")): float(pd.to_numeric(row.get("qte_stock_totale"), errors="coerce") or 0.0)
-        for row in stock
-    }
-    st.session_state.bc_verification = {
-        "signature": signature,
-        "manquants": [
-            {
-                "Réf. Article": ref,
-                "Désignation": ligne["design"],
-                "Qté demandée": ligne["qte"],
-                "Qté max commandable": dispo.get(ref, 0.0),
-            }
-            for ref, ligne in lignes.items()
-            if ligne["qte"] > dispo.get(ref, 0.0)
-        ],
-    }
-
-verification = st.session_state.get("bc_verification")
-
-if not verification or verification["signature"] != signature:
-    st.info("Vérifiez la disponibilité des quantités pour pouvoir générer le PDF.")
-    st.stop()
-
-if verification["manquants"]:
-    st.error("Stock insuffisant pour certains articles — ajustez les quantités puis vérifiez à nouveau.")
-    show_df(pd.DataFrame(verification["manquants"]), key_suffix="bc_manquants")
-    st.stop()
-
-st.success("Toutes les quantités demandées sont disponibles en stock.")
+if positions_depassement:
+    st.warning(
+        "Certaines quantités dépassent le stock disponible (lignes surlignées en rouge ci-dessus). "
+        "Le bon de commande peut tout de même être généré."
+    )
 
 # ---------------------------------------------------------------------------
-# 5. PDF récapitulatif
+# 4. PDF récapitulatif
 # ---------------------------------------------------------------------------
 date_commande = datetime.date.today().isoformat()
 

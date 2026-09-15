@@ -38,17 +38,17 @@ def get_top_clients_from_docentete(client_schema: str, date_from: str, date_to: 
             
         tiers = doc.get("do_tiers")
         name = doc.get("ct_intitule") or tiers or "Inconnu"
-        amount = float(doc.get("do_totalht") or 0.0)
-        
+        amount = float(doc.get("do_totalttc") or 0.0)
+
         if tiers not in client_totals:
             client_totals[tiers] = {
                 "do_tiers": tiers,
                 "ct_intitule": name,
-                "ca_ht": 0.0,
+                "ca_ttc": 0.0,
                 "nb_factures": 0
             }
-        client_totals[tiers]["ca_ht"] += amount
+        client_totals[tiers]["ca_ttc"] += amount
         client_totals[tiers]["nb_factures"] += 1
-        
-    sorted_clients = sorted(client_totals.values(), key=lambda x: x["ca_ht"], reverse=True)
+
+    sorted_clients = sorted(client_totals.values(), key=lambda x: x["ca_ttc"], reverse=True)
     return sorted_clients

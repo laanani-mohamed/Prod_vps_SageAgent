@@ -18,7 +18,7 @@ if DASHBOARD_DIR not in sys.path:
 # Configuration de la page
 # ---------------------------------------------------------------------------
 st.set_page_config(
-    page_title="SAGE-BI ERP",
+    page_title="ITBORD",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -33,17 +33,84 @@ apply_custom_css()
 # Authentification
 # ---------------------------------------------------------------------------
 if "access_token" not in st.session_state:
-    st.markdown("<h1 style='text-align: center; margin-top: 50px;'>🔒 Connexion SAGE-BI ERP</h1>", unsafe_allow_html=True)
-    
-    col1, col2, col3 = st.columns([1, 1, 1])
+    st.markdown("""
+        <style>
+        [data-testid="stAppViewContainer"] > .main {
+            background: #f5f6fa;
+        }
+        [data-testid="stHeader"] { background: transparent !important; }
+
+        .login-brand { text-align: center; margin: 56px 0 24px; }
+        .login-brand h1 {
+            font-size: 1.6rem; margin: 0; color: #262730;
+            letter-spacing: 1px; font-weight: 700;
+        }
+        .login-brand .dots { margin-top: 10px; letter-spacing: 6px; color: #262730; }
+
+        div.st-key-login_card {
+            background: #ffffff !important;
+            border-radius: 16px !important;
+            border: none !important;
+            box-shadow: 0 8px 28px rgba(38, 39, 48, 0.10) !important;
+            padding: 8px 8px 16px 8px !important;
+        }
+        div.st-key-login_card h4 {
+            margin-bottom: 20px !important;
+            color: #262730;
+            font-weight: 700;
+        }
+        div.st-key-login_card label p {
+            font-size: 0.85rem !important;
+            color: #52525b !important;
+            font-weight: 500 !important;
+        }
+        div.st-key-login_card input {
+            border-radius: 8px !important;
+            border: 1px solid transparent !important;
+            background-color: #f0f2f6 !important;
+        }
+        div.st-key-login_card input:focus {
+            border: 1px solid #ff4b4b !important;
+            box-shadow: 0 0 0 1px #ff4b4b !important;
+        }
+        div.st-key-login_card [data-testid="stFormSubmitButton"] button {
+            background: #ff4b4b !important;
+            border: none !important;
+            border-radius: 8px !important;
+            font-weight: 600 !important;
+        }
+        div.st-key-login_card [data-testid="stFormSubmitButton"] button:hover {
+            background: #e03131 !important;
+        }
+        div.st-key-login_card [data-testid="stFormSubmitButton"] button p {
+            color: #ffffff !important;
+        }
+        .login-footer {
+            text-align: center; margin-top: 22px;
+            color: #8b8b94; font-size: 0.8rem;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    st.markdown(
+        """
+        <div class="login-brand">
+            <h1>ITBORD</h1>
+            <div class="dots">●&nbsp;●&nbsp;·</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    col1, col2, col3 = st.columns([1, 1.1, 1])
     with col2:
-        with st.container(border=True):
+        with st.container(border=True, key="login_card"):
             with st.form("login_form"):
-                st.markdown("### Identifiants")
+                st.markdown("#### Se connecter à votre compte")
                 username = st.text_input("Nom d'utilisateur", placeholder="ex: admin")
-                password = st.text_input("Mot de passe", type="password", placeholder="Votre mot de passe")
-                submit = st.form_submit_button("Se Connecter", use_container_width=True)
-                
+                password = st.text_input("Mot de passe", type="password", placeholder="*****")
+                submit = st.form_submit_button("Se connecter", use_container_width=True, type="primary")
+
                 if submit:
                     if not username or not password:
                         st.warning("Veuillez saisir vos identifiants.")
@@ -88,6 +155,8 @@ if "access_token" not in st.session_state:
                                 st.error(f"Erreur API ({resp.status_code}): {resp.text}")
                         except Exception as e:
                             st.error(f"Impossible de joindre le serveur API: {e}")
+
+    st.markdown('<p class="login-footer">🔒 Connexion sécurisée — Plateforme Business Intelligence Sage</p>', unsafe_allow_html=True)
 else:
     # ---------------------------------------------------------------------------
     # Sidebar

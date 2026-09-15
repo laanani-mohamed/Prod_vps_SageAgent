@@ -39,7 +39,7 @@ def execute(req: TopClientsRequest) -> RapportResponse:
 
     df = pl.from_dicts(rows, infer_schema_length=500)
     df = df.with_columns(
-        safe_float_col(df, "do_totalht").alias("do_totalht_f")
+        safe_float_col(df, "do_totalttc").alias("do_totalttc_f")
     )
 
     data = calc_top_clients_rapport(df, None, req.limit)

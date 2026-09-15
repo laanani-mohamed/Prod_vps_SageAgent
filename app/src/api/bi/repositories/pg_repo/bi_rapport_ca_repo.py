@@ -28,7 +28,7 @@ class PgBIRapportCARepository(BaseBIRepository):
 
         col_aliases = [
             "do_domaine", "do_type", "do_date",
-            "do_totalht", "do_piece",
+            "do_totalttc", "do_piece",
             "do_tiers", "ct_intitule",
             "ct_ville",
             "co_no", "co_fullname",
@@ -39,7 +39,7 @@ SELECT
     e.do_domaine,
     e.do_type,
     CAST(e.do_date AS TEXT) AS do_date,
-    e.do_totalht,
+    e.do_totalttc,
     e.do_piece,
     e.do_tiers,
     ct.ct_intitule,

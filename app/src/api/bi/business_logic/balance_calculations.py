@@ -8,6 +8,21 @@ from typing import List, Dict, Any
 import polars as pl
 from datetime import date
 
+_MOIS_FR = [
+    "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
+    "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre",
+]
+
+
+def _label_mois_annee(annee: int, mois: int, decalage: int) -> str:
+    """Libellé 'Mois Année' du mois situé `decalage` mois avant (annee, mois)."""
+    m = mois - decalage
+    y = annee
+    while m <= 0:
+        m += 12
+        y -= 1
+    return f"{_MOIS_FR[m - 1]} {y}"
+
 
 def calculate_balance_client(data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
@@ -73,22 +88,27 @@ def calculate_balance_client(data: List[Dict[str, Any]]) -> List[Dict[str, Any]]
         pl.when(pl.col("month_diff") > 6).then(pl.col("reste_a_payer")).otherwise(0.0).alias("a_nouveau"),
     ])
 
+    # Libellés "Mois Année" pour M6..M1, calculés par rapport au mois en cours
+    labels = {
+        f"m{d}": _label_mois_annee(current_year, current_month, d) for d in range(1, 7)
+    }
+
     # Aggregate by client
     df_agg = df.group_by(["do_tiers", "ct_intitule"]).agg([
         pl.sum("a_nouveau").alias("A Nouveau"),
-        pl.sum("m6").alias("M6"),
-        pl.sum("m5").alias("M5"),
-        pl.sum("m4").alias("M4"),
-        pl.sum("m3").alias("M3"),
-        pl.sum("m2").alias("M2"),
-        pl.sum("m1").alias("M1"),
+        pl.sum("m6").alias(labels["m6"]),
+        pl.sum("m5").alias(labels["m5"]),
+        pl.sum("m4").alias(labels["m4"]),
+        pl.sum("m3").alias(labels["m3"]),
+        pl.sum("m2").alias(labels["m2"]),
+        pl.sum("m1").alias(labels["m1"]),
         pl.sum("en_cours").alias("En Cours")
     ])
 
     # Calculate Total
     df_agg = df_agg.with_columns([
-        (pl.col("A Nouveau") + pl.col("M6") + pl.col("M5") + pl.col("M4") + 
-         pl.col("M3") + pl.col("M2") + pl.col("M1") + pl.col("En Cours")).alias("Totale")
+        (pl.col("A Nouveau") + pl.col(labels["m6"]) + pl.col(labels["m5"]) + pl.col(labels["m4"]) +
+         pl.col(labels["m3"]) + pl.col(labels["m2"]) + pl.col(labels["m1"]) + pl.col("En Cours")).alias("Totale")
     ])
 
     # Sort by Totale descending
