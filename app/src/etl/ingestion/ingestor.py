@@ -1,6 +1,7 @@
 import logging
 import psycopg2
 import psycopg2.errors
+from psycopg2 import sql
 import os
 from config.db_config import DB_CONFIG
 from map_data.reference.file_table_map import FILE_TABLE_MAP, INSERTION_ORDER
@@ -9,6 +10,13 @@ from etl.utils.db_safe import db_retry, safe_search_path, safe_truncate, safe_co
 from etl.utils.null_cleaner import clean_null_values
 
 logger = logging.getLogger("etl.ingestor")
+
+
+def _file_has_data(filepath: str) -> bool:
+    """Un fichier Sage ne contenant qu'un BOM et/ou une fin de ligne n'a aucune
+    donnée réelle à copier."""
+    with open(filepath, 'r', encoding='utf-8-sig', errors='replace') as f:
+        return bool(f.read().strip())
 
 @db_retry(max_attempts=3, delay=5)
 def ingest(folder_path: str, client_schema: str, run_id: str) -> tuple[bool, str, str]:
@@ -65,23 +73,39 @@ def ingest(folder_path: str, client_schema: str, run_id: str) -> tuple[bool, str
             filename = next(f for f in found_files if expected_upper_map[f.upper()] == table_name)
             filepath = os.path.join(folder_path, filename)
 
-            logger.info(f"COPY → {table_name}", 
-                        extra={"run_id": run_id, "client": client_schema, "table": table_name, "step": "ingestion_copy"})
+            # Récupérer l'ordre exact des colonnes défini pour cette table
+            cols = COLUMNS_ORDER.get(table_name)
+            if not cols:
+                raise ValueError(f"Ordre des colonnes non défini pour la table : {table_name}")
 
-            # Ouverture binaire : permet de détecter et sauter le BOM Windows (\xef\xbb\xbf)
-            # sans que psycopg2 puisse le "court-circuiter" (comme il le ferait en mode texte)
-            with open(filepath, 'rb') as f:
-                bom = f.read(3)
-                if bom != b'\xef\xbb\xbf':
-                    f.seek(0)  # Pas de BOM → on revient au début
+            if not _file_has_data(filepath):
+                # Fichier vide (accepté en avertissement à la validation) : on insère une
+                # ligne NULL de repli plutôt que d'appeler COPY sur un fichier sans données,
+                # pour ne pas bloquer l'ingestion des autres tables du client.
+                logger.warning(
+                    f"Fichier vide pour {table_name} — insertion d'une ligne NULL de repli.",
+                    extra={"run_id": run_id, "client": client_schema, "table": table_name, "step": "ingestion_copy"}
+                )
+                insert_null_row = sql.SQL("INSERT INTO {schema}.{table} ({cols}) VALUES ({vals})").format(
+                    schema=sql.Identifier(client_schema.lower()),
+                    table=sql.Identifier(table_name.lower()),
+                    cols=sql.SQL(", ").join(sql.Identifier(c) for c in cols),
+                    vals=sql.SQL(", ").join(sql.SQL("NULL") for _ in cols),
+                )
+                cur.execute(insert_null_row)
+            else:
+                logger.info(f"COPY → {table_name}",
+                            extra={"run_id": run_id, "client": client_schema, "table": table_name, "step": "ingestion_copy"})
 
-                # Récupérer l'ordre exact des colonnes défini pour cette table
-                cols = COLUMNS_ORDER.get(table_name)
-                if not cols:
-                    raise ValueError(f"Ordre des colonnes non défini pour la table : {table_name}")
+                # Ouverture binaire : permet de détecter et sauter le BOM Windows (\xef\xbb\xbf)
+                # sans que psycopg2 puisse le "court-circuiter" (comme il le ferait en mode texte)
+                with open(filepath, 'rb') as f:
+                    bom = f.read(3)
+                    if bom != b'\xef\xbb\xbf':
+                        f.seek(0)  # Pas de BOM → on revient au début
 
-                # Mode TEXT (pas CSV) pour ignorer les guillemets dans les données Sage (SÉCURISÉ)
-                cur.copy_expert(sql=safe_copy(client_schema.lower(), table_name, cols), file=f)
+                    # Mode TEXT (pas CSV) pour ignorer les guillemets dans les données Sage (SÉCURISÉ)
+                    cur.copy_expert(sql=safe_copy(client_schema.lower(), table_name, cols), file=f)
 
             # Si la table est F_COLLABORATEUR, on insère la ligne par défaut co_no = 0 pour éviter des violations FK
             if table_name == "F_COLLABORATEUR":

@@ -1,0 +1,6 @@
+﻿1	AMINE 	AMINE 	Agent de comptoir	1	1				
+2	BOUJOUD	KHALID 	Responsable Commercial 	1	1				
+3	EL MAHFOUD	AYOUB	Community Manager 	1	0				
+7	MOHAMED	MED	AGENT DE COMPTOIR	1	0				
+5	OUZDA	HOUCINE	PDG	1	1				
+6	SAGHIR	Amal	Assistante de direction 	1	0				

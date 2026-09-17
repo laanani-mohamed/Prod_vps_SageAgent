@@ -26,6 +26,7 @@ def validate_identifier(name: str, label: str = "identifiant") -> str:
 def safe_search_path(schema: str) -> sql.Composed:
     """ Produit une requête protégée : SET search_path TO "nom_du_schema" """
     validate_identifier(schema, "schéma client")
+    # On force schema en minuscules pour correspondre au stockage standard Postgres
     return sql.SQL("SET search_path TO {};").format(sql.Identifier(schema.lower()))
 
 def safe_truncate(schema: str, tables: List[str]) -> sql.Composed:

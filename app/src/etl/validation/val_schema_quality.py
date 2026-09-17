@@ -358,8 +358,24 @@ def _validate_column_types(
 
             # Pour les dates/timestamps (ex: 2022-06-06 00:00:00.000), le cast() natif de Polars
             # échoue souvent car il attend un 'T'. On valide simplement la partie YYYY-MM-DD.
+            # Certains fichiers Sage (ex: MULIPARTS) livrent les dates au format JJ/MM/AAAA
+            # (ex: '04/01/2021') plutôt qu'ISO : on tente les deux formats avant de rejeter.
             if target_dtype in (pl.Date, pl.Datetime):
-                expr_cast = expr_raw.str.slice(0, 10).cast(pl.Date, strict=False)
+                expr_cast = pl.coalesce(
+                    expr_raw.str.slice(0, 10).cast(pl.Date, strict=False),
+                    expr_raw.str.to_date("%d/%m/%Y", strict=False),
+                )
+            elif target_dtype in (pl.Float32, pl.Float64):
+                # Certains fichiers Sage (ex: MULIPARTS) livrent les décimaux au format
+                # français avec virgule (ex: '10592,23') plutôt qu'avec un point.
+                expr_cast = expr_raw.str.replace(",", ".", literal=True).cast(target_dtype, strict=False)
+            elif target_dtype == pl.Int64:
+                # Certaines colonnes entières (ex: co_no) reçoivent une valeur décimale
+                # (ex: '204.1') côté Sage : on l'accepte en tronquant vers l'entier.
+                expr_cast = pl.coalesce(
+                    expr_raw.cast(pl.Int64, strict=False),
+                    expr_raw.cast(pl.Float64, strict=False).cast(pl.Int64, strict=False),
+                )
             else:
                 expr_cast = expr_raw.cast(target_dtype, strict=False)
 
@@ -629,15 +645,35 @@ def validate_schema_quality(
             },
         )
 
-        # --- NETTOYAGE AUTO ---
-        # Si le fichier contient des tabulations accidentelles, on les fusionne 
-        # AVANT la validation de la Phase 1 pour ne pas bloquer faussement l'ETL.
-        clean_sage_file(filepath, table_name, run_id, client_schema)
+        # --- Fichier vide : non bloquant, simple avertissement ---
+        # Un fichier Sage vide (0 octet, ou ne contenant qu'un BOM / une fin de ligne,
+        # donc 0 ligne de données réelle) n'est pas une erreur de qualité : on le
+        # signale et on passe au fichier suivant sans faire échouer l'ETL. L'ingestion
+        # gère ensuite ce cas (ligne NULL de repli) plutôt que de bloquer le client.
+        with open(filepath, 'r', encoding='utf-8-sig', errors='replace') as f:
+            has_data = bool(f.read().strip())
+        if not has_data:
+            logger.warning(
+                f"Fichier vide ignoré (aucune donnée) : {filename}.",
+                extra={
+                    "run_id": run_id,
+                    "client": client_schema,
+                    "table": table_name,
+                    "fichier": filename,
+                    "step": "validation_schema_quality",
+                },
+            )
+            continue
 
         # --- Récupération du schéma PG ---
         pg_columns = _get_pg_schema(client_schema, table_name, run_id)
         if not pg_columns:
             return False  # Déjà loggué dans _get_pg_schema
+
+        # --- NETTOYAGE AUTO ---
+        # Si le fichier contient des tabulations accidentelles, on les fusionne
+        # AVANT la validation de la Phase 1 pour ne pas bloquer faussement l'ETL.
+        clean_sage_file(filepath, table_name, run_id, client_schema, pg_columns)
 
         # --- Phase 1 : Nombre de colonnes ---
         if not _validate_column_count_all_rows(filepath, pg_columns, table_name, client_schema, run_id):
