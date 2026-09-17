@@ -1,8 +1,0 @@
-﻿1	2mars
-3	MyAbdellah
-4	OuledSaleh
-6	ELMZABIENE
-7	Rue de Bruxelles
-8	PERIME
-9	ECHANTLLION
-10	CONSIGNATION

@@ -1,0 +1,3 @@
+# Données ETL locales — ne doivent pas être versionnées
+storage_srv/
+app/logs/
