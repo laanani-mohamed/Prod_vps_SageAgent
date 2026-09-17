@@ -16,7 +16,7 @@ from api.auth.schemas import TokenData
 from api._base_router import secured_handle
 
 from api.bi.schemas import (
-    DashboardRequest, DashboardResponse, ObjectifsResponse,
+    DashboardRequest, DashboardResponse, ObjectifsResponse, LastUpdateResponse,
     RapportCARequest, TopClientsRequest, TopArticlesRequest,
     RapportResponse, KpiAnalytiqueResponse, BalanceClientRequest,
     RapportVisiteClientRequest, ValeurStockRequest,
@@ -26,7 +26,7 @@ from api.bi.service import (
     get_dashboard, get_objectifs, get_analytique,
     get_rapport_ca, get_top_clients, get_top_articles,
     get_balance_client, get_rapport_visite, get_valeur_stock,
-    get_rapport_consommation, get_balance_agee,
+    get_rapport_consommation, get_balance_agee, get_last_update,
 )
 
 logger = logging.getLogger("api.bi.router")
@@ -61,6 +61,25 @@ def dashboard(
         current_user=current_user,
         client_schema=req.client_schema,
         req=req
+    )
+
+
+@router.get(
+    "/dashboard/last-update",
+    response_model=LastUpdateResponse,
+    summary="Horodatage de la dernière ingestion ETL réussie pour ce client",
+)
+def dashboard_last_update(
+    request: Request,
+    client_schema: str = Query(..., description="Schéma client"),
+    current_user: TokenData = Depends(require_role("analyst"))
+) -> LastUpdateResponse:
+    return secured_handle(
+        get_last_update,
+        endpoint="/api/bi/dashboard/last-update",
+        request=request,
+        current_user=current_user,
+        client_schema=client_schema
     )
 
 

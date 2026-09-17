@@ -36,6 +36,13 @@ class DashboardRequest(BaseBIRequest):
     date_to: Optional[str] = Field(None, description="Date fin YYYY-MM-DD")
 
 
+class LastUpdateResponse(BaseModel):
+    client_schema: str
+    last_update: Optional[str] = Field(
+        None, description="Horodatage ISO de la dernière ingestion réussie (PipelineCompleted), ou None si aucune"
+    )
+
+
 class KPIData(BaseModel):
     chiffre_affaires: float = 0.0
     ca_n_minus_1: float = 0.0

@@ -188,10 +188,16 @@ def clean_sage_file(filepath: str, table_name: str, run_id: str = "N/A", client_
             cols = line_clean.split('\t')
             fixed = False
 
+            # Idempotence : une ligne qui a déjà le nombre de colonnes final attendu
+            # a déjà été nettoyée (par ce run ou un précédent, ex: retry après une
+            # erreur infra). La retraiter fusionnerait/paddérait à tort des colonnes
+            # déjà correctes (ex: dl_design qui absorbe dl_qte/dl_qtebc).
+            already_clean = len(cols) == expected_count
+
             # 1) Trop de colonnes par rapport à la baseline du client : une tabulation
             #    parasite a coupé le champ texte (ex: 'AIR FILTER ' / 'R932') → on fusionne.
             baseline_diff = len(cols) - baseline_count
-            if baseline_diff > 0 and text_col_idx is not None:
+            if not already_clean and baseline_diff > 0 and text_col_idx is not None:
                 end_idx = text_col_idx + baseline_diff
                 merged_text = " ".join(cols[text_col_idx : end_idx + 1])
                 merged_text = " ".join(merged_text.split())
@@ -200,7 +206,7 @@ def clean_sage_file(filepath: str, table_name: str, run_id: str = "N/A", client_
 
             # 2) Colonnes de fin systématiquement absentes chez ce client : on les
             #    complète avec les valeurs sources configurées (ex: montants nets).
-            if fallback_specs and len(cols) == baseline_count:
+            if not already_clean and fallback_specs and len(cols) == baseline_count:
                 new_cols = list(cols)
                 for missing_idx, source_idx in sorted(fallback_specs):
                     if missing_idx != len(new_cols) or source_idx >= len(new_cols):

@@ -10,13 +10,16 @@ def archive_folder(folder_path: str, client_schema: str, success: bool = True, r
     """
     Ne supprime PAS le dossier racine du client (ex: /upload/Client_01).
     Déplace UNIQUEMENT les fichiers à l'intérieur en les horodatant.
-    Succès  -> /archives/Client_XX/
-    Échec   -> /error/Client_XX/
+    Succès  -> /archives/Client_XX/YYYY-MM-DD/
+    Échec   -> /error/Client_XX/YYYY-MM-DD/
+    (même logique de répartition client → date que pour les logs)
     """
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    now = datetime.now()
+    timestamp = now.strftime("%Y%m%d_%H%M%S")
+    date_str = now.strftime("%Y-%m-%d")
     dest_root = ARCHIVE_BASE_PATH if success else ERROR_BASE_PATH
 
-    dest_path = os.path.join(dest_root, client_schema)
+    dest_path = os.path.join(dest_root, client_schema, date_str)
     os.makedirs(dest_path, exist_ok=True)
 
     files_moved = 0

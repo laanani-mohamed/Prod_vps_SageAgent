@@ -1,7 +1,24 @@
 import io
 import pandas as pd
+import streamlit as st
 from fpdf import FPDF
 import datetime
+
+from services.bi_service import get_last_update
+from core.formatters import format_datetime_minute
+
+
+def _derniere_maj_text() -> str:
+    """Texte 'Derniere mise a jour: JJ/MM/AAAA HH:MM' pour le client courant,
+    ou chaîne vide si le client/l'horodatage n'est pas disponible."""
+    client_schema = st.session_state.get("client_schema", "")
+    if not client_schema:
+        return ""
+    try:
+        last_update = get_last_update(client_schema)
+    except Exception:
+        return ""
+    return f"Derniere mise a jour: {format_datetime_minute(last_update)}"
 
 
 def _format_numeric_cols(df: pd.DataFrame) -> pd.DataFrame:
@@ -90,6 +107,9 @@ def export_df_to_pdf(df: pd.DataFrame, title: str, subtitle: str = "", recap_row
 
     pdf.set_font("Arial", size=9)
     pdf.cell(0, 8, txt=f"Genere le: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", ln=True, align='L')
+    derniere_maj = _derniere_maj_text()
+    if derniere_maj:
+        pdf.cell(0, 8, txt=derniere_maj, ln=True, align='L')
     pdf.ln(4)
 
     if not df.empty:
@@ -145,6 +165,9 @@ def export_visite_to_pdf(sections: list, title: str, subtitle: str = "") -> byte
 
     pdf.set_font("Arial", size=9)
     pdf.cell(0, 8, txt=f"Genere le: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", ln=True, align='L')
+    derniere_maj = _derniere_maj_text()
+    if derniere_maj:
+        pdf.cell(0, 8, txt=derniere_maj, ln=True, align='L')
     pdf.ln(4)
 
     page_width = pdf.w - 2 * pdf.l_margin

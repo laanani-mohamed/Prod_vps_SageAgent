@@ -1,4 +1,5 @@
 from typing import Optional, Final
+from datetime import datetime
 
 DEVISE: Final[str] = "DH"
 
@@ -28,3 +29,12 @@ def format_date(val: Optional[str]) -> str:
     if not val or val == "-":
         return "-"
     return str(val).split(" ")[0]
+
+def format_datetime_minute(val: Optional[str]) -> str:
+    """Horodatage ISO (ex: '2026-09-17T10:36:48.117130+00:00') -> 'JJ/MM/AAAA HH:MM'."""
+    if not val:
+        return "-"
+    try:
+        return datetime.fromisoformat(str(val)).strftime("%d/%m/%Y %H:%M")
+    except ValueError:
+        return "-"

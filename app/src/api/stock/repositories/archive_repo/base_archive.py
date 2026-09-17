@@ -30,7 +30,9 @@ class BaseArchiveStockRepository(BaseStockRepository):
         return None
 
     def _find_closest_snapshot(self, archive_dir: str, table: str, target_dt: Optional[datetime]) -> Optional[str]:
-        pattern = os.path.join(archive_dir, f"{table}_*.txt")
+        # Les fichiers sont maintenant répartis par sous-dossier de date (YYYY-MM-DD/),
+        # d'où le "*" intermédiaire pour parcourir toutes les dates.
+        pattern = os.path.join(archive_dir, "*", f"{table}_*.txt")
         files = glob.glob(pattern)
         if not files:
             return None
@@ -80,7 +82,9 @@ class BaseArchiveStockRepository(BaseStockRepository):
         return best_ts
 
     def _load_archive_file(self, archive_dir: str, table: str, timestamp: str) -> Optional[pl.DataFrame]:
-        filepath = os.path.join(archive_dir, f"{table}_{timestamp}.txt")
+        # Le timestamp ("YYYYMMDD_HHMMSS") encode déjà la date du sous-dossier.
+        date_dir = f"{timestamp[0:4]}-{timestamp[4:6]}-{timestamp[6:8]}"
+        filepath = os.path.join(archive_dir, date_dir, f"{table}_{timestamp}.txt")
         if not os.path.exists(filepath):
             return None
 

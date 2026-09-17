@@ -2,8 +2,62 @@ import logging
 from logging.handlers import RotatingFileHandler
 import json
 import os
+import re
 import sys
 from datetime import datetime, timezone
+
+# Client sans info explicite dans le log (ex: démarrage, heartbeat du watcher)
+_GENERAL_LOG_FOLDER = "_general"
+_SAFE_FOLDER_PATTERN = re.compile(r'[^a-zA-Z0-9_\-]')
+
+
+class ClientDateRotatingFileHandler(logging.Handler):
+    """
+    Handler qui répartit les logs par client puis par date, à l'image de
+    l'arborescence storage_srv/<categorie>/<client>/... :
+
+        logs/etl.log/<CLIENT>/<YYYY-MM-DD>.log
+        logs/etl_error.log/<CLIENT>/<YYYY-MM-DD>.log
+
+    Le client est lu depuis l'attribut `client` passé en `extra=` par les
+    appels de log ETL ; à défaut (logs génériques sans client), les entrées
+    sont regroupées dans un dossier `_general`.
+    """
+
+    def __init__(self, base_dir: str, level=logging.NOTSET):
+        super().__init__(level)
+        self.base_dir = base_dir
+        self._handlers: dict[tuple[str, str], logging.FileHandler] = {}
+
+    def _safe_folder_name(self, name: str) -> str:
+        return _SAFE_FOLDER_PATTERN.sub('_', name) or _GENERAL_LOG_FOLDER
+
+    def _get_file_handler(self, client: str, date_str: str) -> logging.FileHandler:
+        key = (client, date_str)
+        handler = self._handlers.get(key)
+        if handler is None:
+            client_dir = os.path.join(self.base_dir, client)
+            os.makedirs(client_dir, exist_ok=True)
+            handler = logging.FileHandler(
+                os.path.join(client_dir, f"{date_str}.log"), encoding='utf-8'
+            )
+            handler.setFormatter(self.formatter)
+            self._handlers[key] = handler
+        return handler
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            client = getattr(record, 'client', None)
+            client = self._safe_folder_name(client) if client else _GENERAL_LOG_FOLDER
+            date_str = datetime.fromtimestamp(record.created, tz=timezone.utc).strftime('%Y-%m-%d')
+            self._get_file_handler(client, date_str).emit(record)
+        except Exception:
+            self.handleError(record)
+
+    def close(self) -> None:
+        for handler in self._handlers.values():
+            handler.close()
+        super().close()
 
 class CustomJSONFormatter(logging.Formatter):
     """
@@ -55,9 +109,18 @@ def setup_logging():
     log_dir = os.path.join(_project_root, "logs")
     os.makedirs(log_dir, exist_ok=True)
 
-    # Chemins des fichiers logs
-    etl_log_path       = os.path.join(log_dir, "etl.log")
-    etl_error_log_path = os.path.join(log_dir, "etl_error.log")
+    # Dossiers racines des logs, subdivisés ensuite par client puis par date
+    # (ex: logs/etl.log/MULIPARTS/2026-09-17.log), à l'image de storage_srv/.
+    etl_log_dir       = os.path.join(log_dir, "etl.log")
+    etl_error_log_dir = os.path.join(log_dir, "etl_error.log")
+
+    # Migration : etl.log / etl_error.log existaient auparavant comme fichiers plats.
+    # On les conserve (renommés) plutôt que de les écraser en créant le dossier.
+    for path in (etl_log_dir, etl_error_log_dir):
+        if os.path.isfile(path):
+            os.rename(path, path + ".legacy")
+    os.makedirs(etl_log_dir, exist_ok=True)
+    os.makedirs(etl_error_log_dir, exist_ok=True)
 
     # Création du Formatter
     json_formatter = CustomJSONFormatter()
@@ -75,17 +138,13 @@ def setup_logging():
     console_handler.setLevel(logging.INFO)
     console_handler.setFormatter(json_formatter)
 
-    # 2. File Handler Global (Niveau INFO+) avec rotation
-    file_handler = RotatingFileHandler(
-        etl_log_path, maxBytes=50 * 1024 * 1024, backupCount=10, encoding='utf-8'
-    )
+    # 2. File Handler Global (Niveau INFO+), réparti par client puis par date
+    file_handler = ClientDateRotatingFileHandler(etl_log_dir)
     file_handler.setLevel(logging.INFO)
     file_handler.setFormatter(json_formatter)
 
-    # 3. File Handler Erreurs (Niveau ERROR+) avec rotation
-    error_file_handler = RotatingFileHandler(
-        etl_error_log_path, maxBytes=50 * 1024 * 1024, backupCount=10, encoding='utf-8'
-    )
+    # 3. File Handler Erreurs (Niveau ERROR+), réparti par client puis par date
+    error_file_handler = ClientDateRotatingFileHandler(etl_error_log_dir)
     error_file_handler.setLevel(logging.ERROR)
     error_file_handler.setFormatter(json_formatter)
 

@@ -12,7 +12,7 @@ import logging
 
 from api.bi.schemas import (
     DashboardRequest, DashboardResponse,
-    ObjectifsResponse,
+    ObjectifsResponse, LastUpdateResponse,
     RapportCARequest, TopClientsRequest, TopArticlesRequest,
     RapportResponse, KpiAnalytiqueResponse,
     RapportVisiteClientRequest, ValeurStockRequest,
@@ -30,6 +30,7 @@ from api.bi.use_cases import (
     rapport_visite_uc,
     valeur_stock_uc,
     consommation_uc,
+    last_update_uc,
 )
 
 logger = logging.getLogger("api.bi.service")
@@ -39,6 +40,12 @@ def get_dashboard(req: DashboardRequest) -> DashboardResponse:
     """KPIs du tableau de bord (CA, Achats, Stock, Encours)."""
     logger.info("[BI] dashboard | schema=%s | source=%s", req.client_schema, req.source_type)
     return dashboard_uc.execute(req)
+
+
+def get_last_update(client_schema: str) -> LastUpdateResponse:
+    """Horodatage de la dernière ingestion ETL réussie pour ce client."""
+    logger.info("[BI] last-update | schema=%s", client_schema)
+    return last_update_uc.execute(client_schema)
 
 
 def get_objectifs(client_schema: str) -> ObjectifsResponse:

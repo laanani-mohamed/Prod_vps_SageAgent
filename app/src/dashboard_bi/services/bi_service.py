@@ -26,6 +26,13 @@ def get_dashboard_kpis(
     return call_api("/api/bi/dashboard", payload)
 
 @cache_data(ttl=300)
+def get_last_update(client_schema: str) -> Optional[str]:
+    """Appelle GET /api/bi/dashboard/last-update et retourne l'horodatage ISO
+    de la dernière ingestion ETL réussie (ou None si aucune)."""
+    data = call_api_get("/api/bi/dashboard/last-update", {"client_schema": client_schema})
+    return data.get("last_update")
+
+@cache_data(ttl=300)
 def get_dashboard_objectifs(client_schema: str) -> list:
     """Appelle GET /api/bi/dashboard/objectifs et retourne la liste."""
     data = call_api_get("/api/bi/dashboard/objectifs", {"client_schema": client_schema})
