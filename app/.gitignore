@@ -37,6 +37,7 @@ htmlcov/
 
 #data/
 #data_Client/
+storage_srv
 
 # Postgres local (si data mountée)
 
