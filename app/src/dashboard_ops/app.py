@@ -3,6 +3,7 @@ dashboard_ops/app.py — Point d'entrée de l'app Streamlit d'observabilité ETL
 App séparée de dashboard_bi (ITBORD) : outil interne de debug, pas destiné aux clients.
 
 Lancer avec : streamlit run src/dashboard_ops/app.py --server.port 8585
+pkill -f "streamlit run src/dashboard_ops" 2>/dev/null; echo "pkill done"
 """
 import sys
 import os

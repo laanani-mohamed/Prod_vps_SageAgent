@@ -5,6 +5,7 @@ import pandas as pd
 from services.log_reader import list_clients, list_dates, read_log_lines
 from services.run_status import list_runs_for_day
 from components.status_badge import status_html
+from components.investigation_view import render_investigation
 
 st.title("Historique des uploads")
 
@@ -22,7 +23,7 @@ with col2:
     date_str = st.selectbox("Date", dates) if dates else None
 
 with col3:
-    status_filter = st.selectbox("Statut", ["Tous", "SUCCESS", "FAILED", "RUNNING", "UNKNOWN"])
+    status_filter = st.selectbox("Statut", ["Tous", "SUCCESS", "FAILED", "RUNNING"])
 
 if not date_str:
     st.info("Aucun log disponible pour ce client.")
@@ -84,12 +85,22 @@ if selected_idx:
 
     if selected_run["status"] == "FAILED":
         if st.button("🔍 Investiguer ce run", type="primary"):
-            st.session_state.investigate_client = client
-            st.session_state.investigate_date = date_str
-            st.session_state.investigate_run = selected_run
-            st.switch_page("pages/2_Investigation.py")
+            st.session_state.inline_investigation = {
+                "client": client,
+                "date_str": date_str,
+                "run": selected_run,
+            }
     else:
         st.caption("Ce run n'est pas en échec — rien à investiguer.")
 
     with st.expander("Log brut de ce run"):
         st.json(selected_run["raw_lines"])
+
+inv = st.session_state.get("inline_investigation")
+if inv:
+    st.divider()
+    st.markdown("### 🔍 Investigation")
+    if st.button("✖ Fermer l'investigation"):
+        del st.session_state["inline_investigation"]
+        st.rerun()
+    render_investigation(inv["client"], inv["date_str"], inv["run"])
