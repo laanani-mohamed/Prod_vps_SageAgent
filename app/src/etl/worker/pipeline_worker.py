@@ -7,6 +7,7 @@ from etl.ingestion.ingestor import ingest
 from etl.archive.archiver import archive_folder
 from etl.orchestration.event_store import append_event
 from etl.orchestration.pipeline_state import init_state, fail_state, complete_state
+from etl.reporting.error_report import write_error_report, purge_old_error_reports
 
 logger = logging.getLogger("etl.worker")
 
@@ -22,36 +23,43 @@ def process(folder_path: str, client_schema: str) -> bool:
     """
     run_id = str(uuid.uuid4())
     init_state(run_id, client_schema)
-        
+    purge_old_error_reports(folder_path)
+
     try:
         # --- Validation Noms ---
-        if not validate_files(folder_path, client_schema, run_id):
+        ok, detail = validate_files(folder_path, client_schema, run_id)
+        if not ok:
             append_event(run_id, client_schema, "FilenameValidationFailed", {"error_code": "INVALID_INPUT_FILES"})
             fail_state(run_id, client_schema, "validation", "INVALID_INPUT_FILES", "Noms de fichiers non conformes.")
             archive_folder(folder_path, client_schema, success=False, run_id=run_id)
             append_event(run_id, client_schema, "ArchiveCompleted", {"destination": "error"})
+            write_error_report(folder_path, client_schema, run_id, detail)
             return True # Data error, not infra
 
         append_event(run_id, client_schema, "FilenameValidationPassed", {"folder": folder_path})
 
         # --- Validation Tailles ---
-        if not validate_sizes(folder_path, client_schema, run_id):
+        ok, detail = validate_sizes(folder_path, client_schema, run_id)
+        if not ok:
             append_event(run_id, client_schema, "SizeValidationFailed", {"error_code": "EMPTY_FILES"})
             fail_state(run_id, client_schema, "validation", "EMPTY_FILES", "Fichier(s) vide(s).")
             archive_folder(folder_path, client_schema, success=False, run_id=run_id)
             append_event(run_id, client_schema, "ArchiveCompleted", {"destination": "error"})
+            write_error_report(folder_path, client_schema, run_id, detail)
             return True
-                
+
         append_event(run_id, client_schema, "SizeValidationPassed", {})
 
         # --- Validation Schéma ---
-        if not validate_schema_quality(folder_path, client_schema, run_id):
+        ok, detail = validate_schema_quality(folder_path, client_schema, run_id)
+        if not ok:
             append_event(run_id, client_schema, "SchemaValidationFailed", {"error_code": "SCHEMA_QUALITY_FAILED"})
             fail_state(run_id, client_schema, "validation", "SCHEMA_QUALITY_FAILED", "Schéma non conforme.")
             archive_folder(folder_path, client_schema, success=False, run_id=run_id)
             append_event(run_id, client_schema, "ArchiveCompleted", {"destination": "error"})
+            write_error_report(folder_path, client_schema, run_id, detail)
             return True
-                
+
         append_event(run_id, client_schema, "SchemaValidationPassed", {})
 
         # --- Ingestion ---
@@ -71,6 +79,7 @@ def process(folder_path: str, client_schema: str) -> bool:
                 fail_state(run_id, client_schema, "ingestion", err_code, "Erreur d'intégrité des données.")
                 archive_folder(folder_path, client_schema, success=False, run_id=run_id)
                 append_event(run_id, client_schema, "ArchiveCompleted", {"destination": "error"})
+                write_error_report(folder_path, client_schema, run_id, {"error_code": err_code, "phase": "ingestion"})
                 return True
             
         # --- Succès ---

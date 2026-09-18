@@ -2,7 +2,7 @@ import logging
 import os
 import shutil
 from datetime import datetime
-from config.etl_config import ARCHIVE_BASE_PATH, ERROR_BASE_PATH
+from config.etl_config import ARCHIVE_BASE_PATH, ERROR_BASE_PATH, ERROR_REPORT_PREFIX
 
 logger = logging.getLogger("etl.archiver")
 
@@ -27,6 +27,8 @@ def archive_folder(folder_path: str, client_schema: str, success: bool = True, r
         for filename in os.listdir(folder_path):
             if filename.startswith('.'):
                 continue # On ne déplace pas les fichiers cachés (comme .retries) dans les archives
+            if filename.startswith(ERROR_REPORT_PREFIX):
+                continue # Le rapport d'erreur reste visible dans le dossier d'upload du client
                 
             src_file = os.path.join(folder_path, filename)
             if os.path.isfile(src_file):

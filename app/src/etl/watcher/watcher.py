@@ -1,7 +1,7 @@
 import os
 import time
 import logging
-from config.etl_config import UPLOAD_BASE_PATH, WATCHER_STABILITY_DELAY, WATCHER_SCAN_INTERVAL, MIN_EXPECTED_FILES, WATCHER_UPLOAD_TIMEOUT
+from config.etl_config import UPLOAD_BASE_PATH, WATCHER_STABILITY_DELAY, WATCHER_SCAN_INTERVAL, MIN_EXPECTED_FILES, WATCHER_UPLOAD_TIMEOUT, ERROR_REPORT_PREFIX
 
 logger = logging.getLogger("etl.watcher")
 
@@ -12,6 +12,8 @@ def _is_folder_stable(folder_path: str) -> bool:
     """
     now = time.time()
     for filename in os.listdir(folder_path):
+        if filename.startswith(ERROR_REPORT_PREFIX):
+            continue
         fpath = os.path.join(folder_path, filename)
         if os.path.isfile(fpath):
             if now - os.stat(fpath).st_mtime < WATCHER_STABILITY_DELAY:
@@ -39,7 +41,8 @@ def watch():
 
                 # Ignorer les dossiers complètement vides
                 files_in_dir = [f for f in os.listdir(folder_path)
-                                 if os.path.isfile(os.path.join(folder_path, f))]
+                                 if os.path.isfile(os.path.join(folder_path, f))
+                                 and not f.startswith(ERROR_REPORT_PREFIX)]
                 if not files_in_dir:
                     continue
 

@@ -19,9 +19,10 @@ Contraintes :
 import logging
 import polars as pl
 import psycopg2
-from typing import List, Dict
+from typing import List, Dict, Optional, Tuple
 
 from config.db_config import DB_CONFIG
+from config.etl_config import ERROR_REPORT_PREFIX
 from map_data.reference.file_table_map import FILE_TABLE_MAP
 from map_data.reference.columns_order_number import COLUMNS_ORDER, COLUMNS_COUNT
 
@@ -136,7 +137,7 @@ def _validate_column_count_all_rows(
     table_name: str,
     client_schema: str,
     run_id: str,
-) -> bool:
+) -> Tuple[bool, Optional[dict]]:
     """
     Phase 1 : vérifie que le nombre de colonnes du fichier
     correspond exactement au nombre de colonnes PostgreSQL attendu.
@@ -207,7 +208,16 @@ def _validate_column_count_all_rows(
                         "step": "validation_schema_quality",
                     },
                 )
-            return False
+            first_bad = bad_rows[0]
+            return False, {
+                "error_code": "SCHEMA_COLUMN_COUNT_MISMATCH",
+                "phase": "schema_quality_phase1",
+                "fichier": filepath.split("/")[-1],
+                "table": table_name,
+                "ligne": first_bad["line_number"],
+                "attendu": f"{expected} colonnes",
+                "valeur_trouvee": f"{first_bad['col_count']} colonnes",
+            }
 
         logger.info(
             f"[Phase 1] OK — {table_name} : {expected} colonnes confirmées pour toutes les lignes.",
@@ -218,7 +228,7 @@ def _validate_column_count_all_rows(
                 "step": "validation_schema_quality",
             },
         )
-        return True
+        return True, None
 
     except Exception as e:
         logger.error(
@@ -231,7 +241,12 @@ def _validate_column_count_all_rows(
                 "step": "validation_schema_quality",
             },
         )
-        return False
+        return False, {
+            "error_code": "FILE_READ_ERROR",
+            "phase": "schema_quality_phase1",
+            "fichier": filepath.split("/")[-1],
+            "table": table_name,
+        }
 
 # ---------------------------------------------------------------------------
 # Phase 2 — Validation des TYPES (toutes les lignes, par position)
@@ -243,7 +258,7 @@ def _validate_column_types(
     table_name: str,
     client_schema: str,
     run_id: str,
-) -> bool:
+) -> Tuple[bool, Optional[dict]]:
     """
     Phase 2 : vérifie la compatibilité des types pour TOUTES les lignes du fichier.
 
@@ -276,9 +291,9 @@ def _validate_column_types(
             encoding="utf8-lossy",
             truncate_ragged_lines=False, # STRICT MODE
             quote_char=None,
-        )
+        ).with_row_index("line_number", offset=1)
         # Noms de colonnes générés par Polars : column_1, column_2, ...
-        col_names = lazy_df.collect_schema().names()
+        col_names = [c for c in lazy_df.collect_schema().names() if c != "line_number"]
 
         # --- Lookup PG par nom (source de vérité pour les types) ---
         pg_type_by_name = {col["column_name"].lower(): col for col in pg_columns}
@@ -317,6 +332,7 @@ def _validate_column_types(
                 invalid_df = (
                     lazy_df
                     .select(
+                        pl.col("line_number"),
                         pl.col(col_polars_name)
                         .str.strip_chars()
                         .str.to_lowercase()
@@ -330,6 +346,7 @@ def _validate_column_types(
                 )
                 if not invalid_df.is_empty():
                     bad_val = invalid_df["val"][0]
+                    bad_line = invalid_df["line_number"][0]
                     logger.error(
                         f"[Phase 2] ÉCHEC — {table_name} col {idx + 1} ({col_name_pg}) : "
                         f"type attendu={type_label}, valeur invalide='{bad_val}'",
@@ -340,13 +357,24 @@ def _validate_column_types(
                             "fichier": filepath.split("/")[-1],
                             "col_position": idx + 1,
                             "col_name_postgres": col_name_pg,
+                            "line_number": bad_line,
                             "type_attendu": type_label,
                             "valeur_exemple": str(bad_val),
                             "error_code": f"TYPE_MISMATCH_COL_{idx + 1}",
                             "step": "validation_schema_quality",
                         },
                     )
-                    return False
+                    return False, {
+                        "error_code": f"TYPE_MISMATCH_COL_{idx + 1}",
+                        "phase": "schema_quality_phase2",
+                        "fichier": filepath.split("/")[-1],
+                        "table": table_name,
+                        "colonne": col_name_pg,
+                        "col_position": idx + 1,
+                        "ligne": bad_line,
+                        "valeur_trouvee": str(bad_val),
+                        "attendu": type_label,
+                    }
                 continue
 
             # --- Cas général : cast Polars, les valeurs non-convertibles → null ---
@@ -382,6 +410,7 @@ def _validate_column_types(
             casted = (
                 lazy_df
                 .select(
+                    pl.col("line_number"),
                     expr_raw.alias("raw"),
                     expr_cast.alias("casted"),
                 )
@@ -397,6 +426,7 @@ def _validate_column_types(
 
             if not casted.is_empty():
                 bad_val = casted["raw"][0]
+                bad_line = casted["line_number"][0]
                 logger.error(
                     f"[Phase 2] ÉCHEC — {table_name} col {idx + 1} ({col_name_pg}) : "
                     f"type attendu={type_label}, valeur invalide='{bad_val}'",
@@ -407,13 +437,24 @@ def _validate_column_types(
                         "fichier": filepath.split("/")[-1],
                         "col_position": idx + 1,
                         "col_name_postgres": col_name_pg,
+                        "line_number": bad_line,
                         "type_attendu": type_label,
                         "valeur_exemple": str(bad_val),
                         "error_code": f"TYPE_MISMATCH_COL_{idx + 1}",
                         "step": "validation_schema_quality",
                     },
                 )
-                return False
+                return False, {
+                    "error_code": f"TYPE_MISMATCH_COL_{idx + 1}",
+                    "phase": "schema_quality_phase2",
+                    "fichier": filepath.split("/")[-1],
+                    "table": table_name,
+                    "colonne": col_name_pg,
+                    "col_position": idx + 1,
+                    "ligne": bad_line,
+                    "valeur_trouvee": str(bad_val),
+                    "attendu": type_label,
+                }
 
         logger.info(
             f"[Phase 2] OK — {table_name} : tous les types conformes.",
@@ -424,7 +465,7 @@ def _validate_column_types(
                 "step": "validation_schema_quality",
             },
         )
-        return True
+        return True, None
 
     except Exception as e:
         logger.error(
@@ -437,7 +478,12 @@ def _validate_column_types(
                 "step": "validation_schema_quality",
             },
         )
-        return False
+        return False, {
+            "error_code": "TYPE_VALIDATION_ERROR",
+            "phase": "schema_quality_phase2",
+            "fichier": filepath.split("/")[-1],
+            "table": table_name,
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -450,7 +496,7 @@ def _validate_not_null(
     table_name: str,
     client_schema: str,
     run_id: str,
-) -> bool:
+) -> Tuple[bool, Optional[dict]]:
     """
     Phase 3 : vérifie les contraintes NOT NULL pour TOUTES les lignes du fichier.
 
@@ -493,7 +539,7 @@ def _validate_not_null(
                 "step": "validation_schema_quality",
             },
         )
-        return True
+        return True, None
 
     try:
         lazy_df = pl.scan_csv(
@@ -504,8 +550,8 @@ def _validate_not_null(
             encoding="utf8-lossy",
             truncate_ragged_lines=False,    # STRICT MODE
             quote_char=None,        # évite le crash sur les \n embarqués
-        )
-        col_names = lazy_df.collect_schema().names()
+        ).with_row_index("line_number", offset=1)
+        col_names = [c for c in lazy_df.collect_schema().names() if c != "line_number"]
 
         for idx, pg_col in not_null_cols:
             if idx >= len(col_names):
@@ -520,6 +566,7 @@ def _validate_not_null(
             violations = (
                 lazy_df
                 .select(
+                    pl.col("line_number"),
                     pl.col(col_polars_name)
                     .str.strip_chars()
                     .alias("val")
@@ -534,6 +581,7 @@ def _validate_not_null(
             )
 
             if not violations.is_empty():
+                bad_line = violations["line_number"][0]
                 logger.error(
                     f"[Phase 3] ÉCHEC — {table_name} col {idx + 1} ({col_name_pg}) : "
                     f"violation NOT NULL détectée (valeur vide ou null).",
@@ -544,13 +592,23 @@ def _validate_not_null(
                         "fichier": filepath.split("/")[-1],
                         "col_position": idx + 1,
                         "col_name_postgres": col_name_pg,
+                        "line_number": bad_line,
                         "type_attendu": pg_col["data_type"],
                         "valeur_exemple": "NULL / vide",
                         "error_code": f"NOT_NULL_VIOLATION_COL_{idx + 1}",
                         "step": "validation_schema_quality",
                     },
                 )
-                return False
+                return False, {
+                    "error_code": f"NOT_NULL_VIOLATION_COL_{idx + 1}",
+                    "phase": "schema_quality_phase3",
+                    "fichier": filepath.split("/")[-1],
+                    "table": table_name,
+                    "colonne": col_name_pg,
+                    "col_position": idx + 1,
+                    "ligne": bad_line,
+                    "attendu": f"{pg_col['data_type']} (non vide)",
+                }
 
         logger.info(
             f"[Phase 3] OK — {table_name} : toutes les contraintes NOT NULL respectées.",
@@ -561,7 +619,7 @@ def _validate_not_null(
                 "step": "validation_schema_quality",
             },
         )
-        return True
+        return True, None
 
     except Exception as e:
         logger.error(
@@ -574,7 +632,12 @@ def _validate_not_null(
                 "step": "validation_schema_quality",
             },
         )
-        return False
+        return False, {
+            "error_code": "NOT_NULL_VALIDATION_ERROR",
+            "phase": "schema_quality_phase3",
+            "fichier": filepath.split("/")[-1],
+            "table": table_name,
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -585,7 +648,7 @@ def validate_schema_quality(
     folder_path: str,
     client_schema: str,
     run_id: str,
-) -> bool:
+) -> Tuple[bool, Optional[dict]]:
     """
     Point d'entrée principal.
     Pour chaque fichier connu (FILE_TABLE_MAP) présent dans folder_path :
@@ -611,7 +674,9 @@ def validate_schema_quality(
 
     files_in_folder_upper = {
         f.upper(): f for f in os.listdir(folder_path)
-        if os.path.isfile(os.path.join(folder_path, f)) and not f.startswith('.')
+        if os.path.isfile(os.path.join(folder_path, f))
+        and not f.startswith('.')
+        and not f.startswith(ERROR_REPORT_PREFIX)
     }
     
     files_to_validate = {}
@@ -630,7 +695,7 @@ def validate_schema_quality(
                 "step": "validation_schema_quality",
             },
         )
-        return True
+        return True, None
 
     for filename, table_name in files_to_validate.items():
         filepath = os.path.join(folder_path, filename)
@@ -668,7 +733,12 @@ def validate_schema_quality(
         # --- Récupération du schéma PG ---
         pg_columns = _get_pg_schema(client_schema, table_name, run_id)
         if not pg_columns:
-            return False  # Déjà loggué dans _get_pg_schema
+            return False, {
+                "error_code": "SCHEMA_NOT_FOUND",
+                "phase": "schema_quality_setup",
+                "fichier": filename,
+                "table": table_name,
+            }  # Déjà loggué dans _get_pg_schema
 
         # --- NETTOYAGE AUTO ---
         # Si le fichier contient des tabulations accidentelles, on les fusionne
@@ -676,16 +746,19 @@ def validate_schema_quality(
         clean_sage_file(filepath, table_name, run_id, client_schema, pg_columns)
 
         # --- Phase 1 : Nombre de colonnes ---
-        if not _validate_column_count_all_rows(filepath, pg_columns, table_name, client_schema, run_id):
-            return False
+        ok, detail = _validate_column_count_all_rows(filepath, pg_columns, table_name, client_schema, run_id)
+        if not ok:
+            return False, detail
 
         # --- Phase 2 : Types ---
-        if not _validate_column_types(filepath, pg_columns, table_name, client_schema, run_id):
-            return False
+        ok, detail = _validate_column_types(filepath, pg_columns, table_name, client_schema, run_id)
+        if not ok:
+            return False, detail
 
         # --- Phase 3 : NOT NULL ---
-        if not _validate_not_null(filepath, pg_columns, table_name, client_schema, run_id):
-            return False
+        ok, detail = _validate_not_null(filepath, pg_columns, table_name, client_schema, run_id)
+        if not ok:
+            return False, detail
 
     logger.info(
         "Validation qualité des données réussie — tous les fichiers conformes.",
@@ -696,4 +769,4 @@ def validate_schema_quality(
             "step": "validation_schema_quality",
         },
     )
-    return True
+    return True, None
