@@ -14,6 +14,7 @@ import polars as pl
 
 from api.bi.schemas import RapportConsommationRequest, RapportResponse
 from api.bi.repositories.pg_repo.bi_consommation_repo import PgBIConsommationRepository
+from api.bi.business_logic.balance_calculations import _label_mois_annee
 
 logger = logging.getLogger("api.bi.use_cases.consommation")
 
@@ -71,16 +72,20 @@ def _pivot_consommation(rows: list) -> tuple:
 
     month_cols = ["mois_en_cours"] + [f"m{i}" for i in range(1, 7)]
 
+    # Libellés "Mois Année" pour M6..M1, calculés par rapport au mois en cours
+    labels = {f"m{d}": _label_mois_annee(cy, cm, d) for d in range(1, 7)}
+
     par_article = (
         df.group_by(["fa_codefamille", "fa_intitule", "ar_ref", "ar_design"])
         .agg([pl.sum(c).alias(c) for c in month_cols])
         .rename({
-            "fa_intitule": "Famille", "ar_design": "Article",
+            "fa_intitule": "Famille", "ar_ref": "Réf. Article", "ar_design": "Article",
             "mois_en_cours": "Mois en cours",
-            "m1": "M1", "m2": "M2", "m3": "M3", "m4": "M4", "m5": "M5", "m6": "M6",
+            "m1": labels["m1"], "m2": labels["m2"], "m3": labels["m3"],
+            "m4": labels["m4"], "m5": labels["m5"], "m6": labels["m6"],
         })
         .sort(["Famille", "Article"])
-        .drop("fa_codefamille", "ar_ref")
+        .drop("fa_codefamille")
         .to_dicts()
     )
 

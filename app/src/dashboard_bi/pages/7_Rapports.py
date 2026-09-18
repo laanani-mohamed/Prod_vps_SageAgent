@@ -173,7 +173,7 @@ def fetch_valeur_stock():
         "source_type": "db_latest"
     }
     try:
-        r = httpx.post(f"{API_BASE_URL}/api/bi/rapport/valeur-stock", json=payload, headers=headers, timeout=30.0)
+        r = httpx.post(f"{API_BASE_URL}/api/bi/rapport/valeur-stock", json=payload, headers=headers, timeout=60.0)
         if r.status_code == 200:
             return r.json().get("data", [])
         st.error(f"Erreur API BI ({r.status_code}) : {r.text}")
@@ -989,9 +989,15 @@ with tab8:
         if df_article.empty:
             st.info("Aucune donnée de consommation par article.")
         else:
-            month_cols = [c for c in ["Mois en cours", "M1", "M2", "M3", "M4", "M5", "M6"] if c in df_article.columns]
+            # S'assurer de l'ordre des colonnes : identifiants, puis mois (libellés
+            # "Mois Année" dans l'ordre renvoyé par l'API, du plus ancien au plus récent)
+            fixed_debut = ["Famille", "Réf. Article", "Article"]
+            mois_cols = [c for c in df_article.columns if c not in fixed_debut]
+            available_cols = [c for c in fixed_debut + mois_cols if c in df_article.columns]
+            df_article = df_article[available_cols]
+
             st.dataframe(
-                df_article.style.format({c: "{:,.2f}" for c in month_cols}),
+                df_article.style.format({c: "{:,.2f}" for c in mois_cols}),
                 use_container_width=True,
             )
 

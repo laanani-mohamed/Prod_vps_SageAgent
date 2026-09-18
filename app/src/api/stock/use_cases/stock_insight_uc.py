@@ -10,18 +10,15 @@ def execute(req: StockInsightRequest) -> StockResponse:
     repo = get_repo("insight", req.source_type)
     raw_data = repo.fetch(req)
 
-    
     insight_type = req.insight_type
     threshold = req.threshold or 0.0
     expiry_days = req.expiry_days or 15
 
     # Appliquer la logique d'alerte
     if insight_type == "expiration":
-        raw_data = repo.fetch(req)
         data = alerts.detect_expiring_lots(raw_data, expiry_days)
         out_cols = ["ar_ref", "ar_design", "fa_intitule", "ls_noserie", "ls_qterestant", "ls_peremption", "jours_restants"]
     else:
-        raw_data = repo.fetch(req)
         alert_map = {
             "rupture": "rupture",
             "stock_bas": "stock_bas",
