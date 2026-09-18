@@ -66,6 +66,14 @@ def _build_message(detail: dict, run_id: str) -> str:
         probleme = "une erreur de configuration interne empêche de traiter votre import."
         actions = "Aucune action de votre part n'est nécessaire sur les fichiers. Contactez votre support technique."
 
+    elif error_code == "WATCHER_TIMEOUT":
+        probleme = "le dépôt de fichiers est resté incomplet trop longtemps (il manque un ou plusieurs fichiers attendus)."
+        actions = "Vérifiez que tous les fichiers requis ont bien été déposés, puis redéposez l'ensemble des fichiers."
+
+    elif error_code == "WATCHER_TOO_MANY_FILES":
+        probleme = "trop de fichiers ont été détectés dans ce dossier par rapport à ce qui est attendu."
+        actions = "Videz le dossier et redéposez uniquement les fichiers requis (un seul jeu de fichiers à la fois)."
+
     else:
         probleme = "une erreur technique est survenue lors du traitement de votre import."
         actions = "Contactez votre support technique en mentionnant la référence ci-dessous."

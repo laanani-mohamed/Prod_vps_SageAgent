@@ -1,4 +1,5 @@
 import logging
+import os
 import uuid
 from etl.validation.val_files_names import validate_files
 from etl.validation.val_files_sizes import validate_sizes
@@ -8,6 +9,7 @@ from etl.archive.archiver import archive_folder
 from etl.orchestration.event_store import append_event
 from etl.orchestration.pipeline_state import init_state, fail_state, complete_state
 from etl.reporting.error_report import write_error_report, purge_old_error_reports
+from config.etl_config import UPLOAD_BASE_PATH
 
 logger = logging.getLogger("etl.worker")
 
@@ -23,7 +25,14 @@ def process(folder_path: str, client_schema: str) -> bool:
     """
     run_id = str(uuid.uuid4())
     init_state(run_id, client_schema)
-    purge_old_error_reports(folder_path)
+
+    # NB: folder_path pointe vers le dossier de file d'attente temporaire
+    # (storage_srv/queue/<client>__<timestamp>/), pas vers le dossier d'upload
+    # SFTP du client (déjà vidé par queue_manager.enqueue avant l'appel à process()).
+    # Le rapport d'erreur doit être visible par le client : on cible donc toujours
+    # son vrai dossier d'upload, pas folder_path.
+    upload_folder = os.path.join(UPLOAD_BASE_PATH, client_schema)
+    purge_old_error_reports(upload_folder)
 
     try:
         # --- Validation Noms ---
@@ -33,7 +42,7 @@ def process(folder_path: str, client_schema: str) -> bool:
             fail_state(run_id, client_schema, "validation", "INVALID_INPUT_FILES", "Noms de fichiers non conformes.")
             archive_folder(folder_path, client_schema, success=False, run_id=run_id)
             append_event(run_id, client_schema, "ArchiveCompleted", {"destination": "error"})
-            write_error_report(folder_path, client_schema, run_id, detail)
+            write_error_report(upload_folder, client_schema, run_id, detail)
             return True # Data error, not infra
 
         append_event(run_id, client_schema, "FilenameValidationPassed", {"folder": folder_path})
@@ -45,7 +54,7 @@ def process(folder_path: str, client_schema: str) -> bool:
             fail_state(run_id, client_schema, "validation", "EMPTY_FILES", "Fichier(s) vide(s).")
             archive_folder(folder_path, client_schema, success=False, run_id=run_id)
             append_event(run_id, client_schema, "ArchiveCompleted", {"destination": "error"})
-            write_error_report(folder_path, client_schema, run_id, detail)
+            write_error_report(upload_folder, client_schema, run_id, detail)
             return True
 
         append_event(run_id, client_schema, "SizeValidationPassed", {})
@@ -57,7 +66,7 @@ def process(folder_path: str, client_schema: str) -> bool:
             fail_state(run_id, client_schema, "validation", "SCHEMA_QUALITY_FAILED", "Schéma non conforme.")
             archive_folder(folder_path, client_schema, success=False, run_id=run_id)
             append_event(run_id, client_schema, "ArchiveCompleted", {"destination": "error"})
-            write_error_report(folder_path, client_schema, run_id, detail)
+            write_error_report(upload_folder, client_schema, run_id, detail)
             return True
 
         append_event(run_id, client_schema, "SchemaValidationPassed", {})
@@ -79,7 +88,7 @@ def process(folder_path: str, client_schema: str) -> bool:
                 fail_state(run_id, client_schema, "ingestion", err_code, "Erreur d'intégrité des données.")
                 archive_folder(folder_path, client_schema, success=False, run_id=run_id)
                 append_event(run_id, client_schema, "ArchiveCompleted", {"destination": "error"})
-                write_error_report(folder_path, client_schema, run_id, {"error_code": err_code, "phase": "ingestion"})
+                write_error_report(upload_folder, client_schema, run_id, {"error_code": err_code, "phase": "ingestion"})
                 return True
             
         # --- Succès ---

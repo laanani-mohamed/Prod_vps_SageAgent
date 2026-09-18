@@ -29,6 +29,7 @@ from config.etl_config import MAX_QUEUE_LIMIT
 from etl.orchestration.event_store import append_event
 from etl.broker import queue_manager
 from etl.worker.pipeline_worker import process
+from etl.reporting.error_report import write_error_report
 
 logger = logging.getLogger("etl.main")
 
@@ -47,6 +48,7 @@ if __name__ == "__main__":
                 error_code = "WATCHER_TIMEOUT" if status == "TIMEOUT" else "WATCHER_TOO_MANY_FILES"
                 append_event(run_id, current_client, "WatcherValidationFailed", {"error_code": error_code})
                 archive_folder(folder_path, current_client, success=False, run_id=run_id)
+                write_error_report(folder_path, current_client, run_id, {"error_code": error_code, "phase": "watcher"})
                 continue
 
             # --- 2. Mise en file d'attente immédiate ---
