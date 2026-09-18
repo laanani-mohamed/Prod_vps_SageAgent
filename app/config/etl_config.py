@@ -25,6 +25,11 @@ ARCHIVE_BASE_PATH = os.path.join(STORAGE_ROOT, "storage_srv", "archives")
 # Dossier pour les imports en erreur
 ERROR_BASE_PATH = os.path.join(STORAGE_ROOT, "storage_srv", "error")
 
+# Dossiers de logs (miroir du calcul fait dans config/logging_config.py::setup_logging)
+LOGS_DIR = os.path.join(PROJECT_ROOT, "logs")
+ETL_LOG_DIR = os.path.join(LOGS_DIR, "etl.log")
+ETL_ERROR_LOG_DIR = os.path.join(LOGS_DIR, "etl_error.log")
+
 # =========================
 # WATCHER CONFIG
 

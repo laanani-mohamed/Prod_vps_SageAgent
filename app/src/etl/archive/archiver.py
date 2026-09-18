@@ -23,24 +23,27 @@ def archive_folder(folder_path: str, client_schema: str, success: bool = True, r
     os.makedirs(dest_path, exist_ok=True)
 
     files_moved = 0
+    archived_filenames = []
     try:
         for filename in os.listdir(folder_path):
             if filename.startswith('.'):
                 continue # On ne déplace pas les fichiers cachés (comme .retries) dans les archives
             if filename.startswith(ERROR_REPORT_PREFIX):
                 continue # Le rapport d'erreur reste visible dans le dossier d'upload du client
-                
+
             src_file = os.path.join(folder_path, filename)
             if os.path.isfile(src_file):
                 name, ext = os.path.splitext(filename)
                 new_filename = f"{name}_{timestamp}{ext}"
                 shutil.move(src_file, os.path.join(dest_path, new_filename))
                 files_moved += 1
+                archived_filenames.append(new_filename)
 
         if files_moved > 0:
             status = "archivés" if success else "mis en quarantaine (error)"
-            logger.info(f"{files_moved} fichier(s) {status} vers : {dest_path}", 
-                        extra={"run_id": run_id, "client": client_schema, "path": dest_path, "step": "archivage_success"})
+            logger.info(f"{files_moved} fichier(s) {status} vers : {dest_path}",
+                        extra={"run_id": run_id, "client": client_schema, "path": dest_path,
+                               "fichiers_archives": archived_filenames, "step": "archivage_success"})
         else:
             logger.warning(f"Aucun fichier trouvé à déplacer dans {folder_path}", 
                            extra={"run_id": run_id, "client": client_schema, "path": folder_path, "step": "archivage_empty"})
