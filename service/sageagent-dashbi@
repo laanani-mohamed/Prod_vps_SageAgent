@@ -1,0 +1,42 @@
+[Unit]
+Description=Dashboard BI Sage - Streamlit App (client %i)
+After=network.target
+
+# Protection contre la Boucle Infinie (Crash Loop)
+StartLimitBurst=5
+StartLimitIntervalSec=60
+
+[Service]
+User=ubuntu
+WorkingDirectory=/opt/SageAgent/app
+
+# Port dédié à ce client, défini dans /etc/sageagent/clients/%i.env (PORT=...)
+EnvironmentFile=/etc/sageagent/clients/%i.env
+
+# Même invocation que le service historique SageAgent_dashbi.service,
+# avec le port et l'adresse (loopback) explicites pour ce client.
+ExecStart=/opt/SageAgent/app/.venv/bin/streamlit run src/dashboard_bi/app.py --server.port=${PORT} --server.address=127.0.0.1
+
+Restart=always
+RestartSec=20
+
+[Install]
+WantedBy=multi-user.target
+
+
+-------------
+# Ce fichier est un template systemd (unit instanciée). Une instance = un client.
+# Installation (une seule fois) :
+sudo cp /opt/SageAgent/service/sageagent-dashbi@ /etc/systemd/system/sageagent-dashbi@.service
+sudo systemctl daemon-reload
+
+# Activer une instance par client (le nom après @ doit correspondre à un fichier
+# /etc/sageagent/clients/<nom>.env, voir /opt/SageAgent/service/clients/) :
+sudo systemctl enable --now sageagent-dashbi@cross
+sudo systemctl enable --now sageagent-dashbi@rousseau
+sudo systemctl enable --now sageagent-dashbi@mms
+sudo systemctl enable --now sageagent-dashbi@muliparts
+sudo systemctl enable --now sageagent-dashbi@client_01
+
+# Vérifier le statut d'un client :
+sudo systemctl status sageagent-dashbi@cross
