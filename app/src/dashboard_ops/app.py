@@ -1,4 +1,11 @@
 """
+# Stopper
+pkill -f "streamlit run src/dashboard_ops"
+
+# Relancer (depuis /opt/SageAgent/app)
+cd /opt/SageAgent/app
+nohup .venv/bin/streamlit run src/dashboard_ops/app.py --server.port 8585 --server.headless true > /tmp/dashboard_ops.log 2>&1 &
+
 dashboard_ops/app.py — Point d'entrée de l'app Streamlit d'observabilité ETL.
 App séparée de dashboard_bi (ITBORD) : outil interne de debug, pas destiné aux clients.
 
