@@ -17,9 +17,35 @@ for path in [project_path, config_path]:
 
 from config.db_config import DB_CONFIG
 
+
+def create_api_user(username: str, password: str, allowed_schemas: list, roles: list) -> None:
+    """
+    Hache le mot de passe et insère l'utilisateur dans auth.users.
+    Réutilisable depuis un script CLI ou depuis la page d'onboarding du dashboard ops.
+    Lève psycopg2.IntegrityError si le username existe déjà.
+    """
+    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+    hashed_password = pwd_context.hash(password)
+
+    conn = psycopg2.connect(**DB_CONFIG)
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            INSERT INTO auth.users (username, hashed_password, allowed_schemas, roles, is_active)
+            VALUES (%s, %s, %s, %s, TRUE)
+            """,
+            (username, hashed_password, allowed_schemas, roles),
+        )
+        conn.commit()
+        cur.close()
+    finally:
+        conn.close()
+
+
 def create_user():
     print("=== CRÉATION D'UN NOUVEL UTILISATEUR API ===")
-    
+
     # 1. Saisie des informations
     username = input("Nom d'utilisateur : ").strip()
     if not username:
@@ -37,33 +63,17 @@ def create_user():
     roles_input = input("Rôles (séparés par une virgule, ex: analyst,vendeur) [défaut: vendeur] : ").strip()
     roles = [r.strip().lower() for r in roles_input.split(',')] if roles_input else ["vendeur"]
 
-    # 2. Hashage du mot de passe
+    # 2. Hashage + insertion (logique commune, voir create_api_user)
     print("\n[1/3] Hachage du mot de passe en cours...")
-    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-    hashed_password = pwd_context.hash(password)
-
-    # 3. Connexion et insertion dans la base de données
     print("[2/3] Connexion à la base de données...")
     try:
-        conn = psycopg2.connect(**DB_CONFIG)
-        cur = conn.cursor()
-        
-        insert_query = """
-        INSERT INTO auth.users (username, hashed_password, allowed_schemas, roles, is_active)
-        VALUES (%s, %s, %s, %s, TRUE)
-        """
-        
         print(f"[3/3] Insertion de l'utilisateur '{username}'...")
-        cur.execute(insert_query, (username, hashed_password, allowed_schemas, roles))
-        
-        conn.commit()
-        cur.close()
-        conn.close()
+        create_api_user(username, password, allowed_schemas, roles)
         print("\n✅ SUCCÈS : L'utilisateur a été créé et inséré dans la base de données !")
         print(f"-> Username : {username}")
         print(f"-> Schémas  : {allowed_schemas}")
         print(f"-> Rôles    : {roles}")
-        
+
     except psycopg2.IntegrityError:
         print(f"\n❌ ERREUR : L'utilisateur '{username}' existe déjà dans la base de données.")
     except Exception as e:

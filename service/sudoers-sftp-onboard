@@ -1,0 +1,18 @@
+# Regle sudoers restreinte : permet a l'utilisateur amohamed (celui qui execute
+# dashboard_ops aujourd'hui, verifie via `ps aux`) de lancer UNIQUEMENT ce script
+# precis en root, sans mot de passe, avec passage de la variable SFTP_PASSWORD.
+#
+# Installation (une seule fois, avec sudo) :
+#   sudo cp service/sudoers-sftp-onboard /etc/sudoers.d/sageagent-sftp-onboard
+#   sudo chmod 440 /etc/sudoers.d/sageagent-sftp-onboard
+#   sudo visudo -c
+#
+# Verification :
+#   sudo -n SFTP_PASSWORD=test /opt/SageAgent/app/utils/client_sftp/sftp_onboard.sh --help
+#   -> ne doit PAS demander de mot de passe (peut afficher l'usage du script, c'est normal)
+#
+# IMPORTANT : si dashboard_ops est un jour migre vers un service systemd tournant
+# sous un autre utilisateur (ex: "ubuntu", comme les autres services SageAgent),
+# cette regle doit etre mise a jour pour cibler ce nouvel utilisateur.
+
+amohamed ALL=(root) NOPASSWD:SETENV: /opt/SageAgent/app/utils/client_sftp/sftp_onboard.sh
