@@ -9,7 +9,8 @@ from typing import Optional
 def validate_schema(schema: str) -> str:
     if not re.match(r"^[a-zA-Z0-9_]+$", schema):
         raise ValueError(f"Nom de schéma invalide : {schema}")
-    return schema.lower()
+    # Quoté car certains noms de client (ex: "cross") sont des mots-clés réservés PostgreSQL
+    return f'"{schema.lower()}"'
 
 def add_in(sql: str, column: str, values: list, params: list) -> str:
     """Ajoute un filtre AND column IN (%s, %s, ...) si values non vide."""

@@ -10,7 +10,8 @@ def validate_schema(schema: str) -> str:
     """Valide et nettoie le nom du schéma PostgreSQL."""
     if not re.match(r"^[a-zA-Z0-9_]+$", schema):
         raise ValueError(f"Nom de schéma invalide : {schema}")
-    return schema.lower()
+    # Quoté car certains noms de client (ex: "cross") sont des mots-clés réservés PostgreSQL
+    return f'"{schema.lower()}"'
 
 
 def build_in_condition(column: str, values: list, params: list) -> str | None:

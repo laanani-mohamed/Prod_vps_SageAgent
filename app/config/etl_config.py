@@ -42,8 +42,8 @@ WATCHER_SCAN_INTERVAL = 15
 # Nombre de fichiers attendus
 MIN_EXPECTED_FILES = len(FILE_TABLE_MAP)
 
-# Délai d'attente maximum (secondes) pour un upload incomplet (4 min)
-WATCHER_UPLOAD_TIMEOUT = 30 #240
+# Délai d'attente maximum (secondes) pour un upload incomplet (10 min)
+WATCHER_UPLOAD_TIMEOUT = 600
 
 
 # =========================
