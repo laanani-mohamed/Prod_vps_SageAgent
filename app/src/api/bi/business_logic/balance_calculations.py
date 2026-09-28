@@ -24,6 +24,21 @@ def _label_mois_annee(annee: int, mois: int, decalage: int) -> str:
     return f"{_MOIS_FR[m - 1]} {y}"
 
 
+# Clés d'agrégation : client + commercial de la facture (F_DOCENTETE.co_no).
+# Un client suivi par plusieurs commerciaux a donc une ligne par commercial.
+_GROUP_KEYS = ["do_tiers", "ct_intitule", "co_no", "co_fullname"]
+_RENAME_KEYS = {
+    "do_tiers": "Ref Client",
+    "ct_intitule": "Nom Client",
+    "co_no": "Code Commercial",
+    "co_fullname": "Commercial",
+}
+
+
+def _group_keys(df: pl.DataFrame) -> List[str]:
+    return [c for c in _GROUP_KEYS if c in df.columns]
+
+
 def calculate_balance_client(data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
     Prend les factures impayées, calcule la différence de mois par rapport à aujourd'hui,
@@ -93,8 +108,9 @@ def calculate_balance_client(data: List[Dict[str, Any]]) -> List[Dict[str, Any]]
         f"m{d}": _label_mois_annee(current_year, current_month, d) for d in range(1, 7)
     }
 
-    # Aggregate by client
-    df_agg = df.group_by(["do_tiers", "ct_intitule"]).agg([
+    # Aggregate by client (et commercial)
+    keys = _group_keys(df)
+    df_agg = df.group_by(keys).agg([
         pl.sum("a_nouveau").alias("A Nouveau"),
         pl.sum("m6").alias(labels["m6"]),
         pl.sum("m5").alias(labels["m5"]),
@@ -115,10 +131,7 @@ def calculate_balance_client(data: List[Dict[str, Any]]) -> List[Dict[str, Any]]
     df_agg = df_agg.sort("Totale", descending=True)
 
     # Rename identifying columns
-    df_agg = df_agg.rename({
-        "do_tiers": "Ref Client",
-        "ct_intitule": "Nom Client"
-    })
+    df_agg = df_agg.rename({k: _RENAME_KEYS[k] for k in keys})
 
     return df_agg.to_dicts()
 
@@ -165,7 +178,8 @@ def calculate_balance_agee(data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         pl.when(pl.col("day_diff") > 120).then(pl.col("reste_a_payer")).otherwise(0.0).alias("j120_plus"),
     ])
 
-    df_agg = df.group_by(["do_tiers", "ct_intitule"]).agg([
+    keys = _group_keys(df)
+    df_agg = df.group_by(keys).agg([
         pl.sum("j0_60").alias("0-60j"),
         pl.sum("j60_90").alias("60-90j"),
         pl.sum("j90_120").alias("90-120j"),
@@ -179,9 +193,6 @@ def calculate_balance_agee(data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
     df_agg = df_agg.sort("Totale", descending=True)
 
-    df_agg = df_agg.rename({
-        "do_tiers": "Ref Client",
-        "ct_intitule": "Nom Client"
-    })
+    df_agg = df_agg.rename({k: _RENAME_KEYS[k] for k in keys})
 
     return df_agg.to_dicts()

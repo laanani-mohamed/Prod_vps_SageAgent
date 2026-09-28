@@ -56,6 +56,26 @@ def render_multi_export_buttons(sections: list, filename_base: str, pdf_title: s
             mime="application/pdf",
             type="primary",
         )
+
+
+def filtre_commercial(df: pd.DataFrame, key: str):
+    """Selectbox "Commercial" alimenté par les commerciaux des factures (F_DOCENTETE.co_no,
+    0 → "Non identifié") ; retourne (df filtré, libellé choisi)."""
+    if df.empty or "Code Commercial" not in df.columns:
+        return df, "Tout"
+    options = {}
+    for co_no, nom in df[["Code Commercial", "Commercial"]].drop_duplicates().itertuples(index=False):
+        options[nom if nom not in options else f"{nom} ({co_no})"] = co_no
+    labels = ["Tout"] + sorted(options)
+    # Valeur mémorisée d'un autre client / d'une autre actualisation → retour à "Tout"
+    if st.session_state.get(key) not in labels:
+        st.session_state.pop(key, None)
+    choix = st.selectbox("Commercial", labels, key=key, help="Commercial (collaborateur) porté par la facture")
+    if choix != "Tout":
+        df = df[df["Code Commercial"] == options[choix]].copy()
+    return df, choix
+
+
 from services.stock_service import get_stock_insights
 from services.referentiel_service import get_comptes_tiers
 
@@ -119,13 +139,13 @@ def fetch_stock_insights(expiry_days: int):
         return []
 
 @st.cache_data(ttl=600, show_spinner=False)
-def fetch_balance_client():
-    """Récupère le rapport Balance Client."""
+def fetch_balance_client(schema: str):
+    """Récupère le rapport Balance Client (une ligne par client × commercial)."""
     if not token:
         return []
-    
+
     payload = {
-        "client_schema": client_schema,
+        "client_schema": schema,
         "source_type": "db_latest"
     }
     try:
@@ -139,13 +159,13 @@ def fetch_balance_client():
         return []
 
 @st.cache_data(ttl=600, show_spinner=False)
-def fetch_balance_agee():
-    """Récupère la balance âgée par clients (tranches en jours)."""
+def fetch_balance_agee(schema: str):
+    """Récupère la balance âgée par clients × commercial (tranches en jours)."""
     if not token:
         return []
 
     payload = {
-        "client_schema": client_schema,
+        "client_schema": schema,
         "source_type": "db_latest"
     }
     try:
@@ -501,31 +521,38 @@ with tab3:
         fetch_balance_client.clear()
 
     with st.spinner("Génération de la balance..."):
-        data = fetch_balance_client()
-        if data:
-            df = pd.DataFrame(data)
+        data = fetch_balance_client(client_schema)
+    df_bal = pd.DataFrame(data) if data else pd.DataFrame()
+    df_bal, commercial_t3 = filtre_commercial(df_bal, "commercial_balance")
 
-            # Remplacer 'Non identifier' si nécessaire
-            if 'Nom Client' in df.columns:
-                df['Nom Client'] = df['Nom Client'].replace({0: "Non Identifier", "0": "Non Identifier", "": "Non Identifier"})
+    if not df_bal.empty:
+        df = df_bal
 
-            # S'assurer de l'ordre des colonnes : identifiants, puis mois (dans l'ordre renvoyé
-            # par l'API, du plus ancien au plus récent), puis les totaux
-            fixed_debut = ["Ref Client", "Nom Client", "A Nouveau"]
-            fixed_fin = ["En Cours", "Totale"]
-            mois_cols = [c for c in df.columns if c not in fixed_debut + fixed_fin]
-            available_cols = [c for c in fixed_debut + mois_cols + fixed_fin if c in df.columns]
-            df_show = df[available_cols]
+        # Remplacer 'Non identifier' si nécessaire
+        if 'Nom Client' in df.columns:
+            df['Nom Client'] = df['Nom Client'].replace({0: "Non Identifier", "0": "Non Identifier", "": "Non Identifier"})
 
-            st.session_state['df_tab3'] = df_show
-        else:
-            st.session_state['df_tab3'] = pd.DataFrame()
+        # S'assurer de l'ordre des colonnes : identifiants, puis mois (dans l'ordre renvoyé
+        # par l'API, du plus ancien au plus récent), puis les totaux. "Code Commercial"
+        # ne sert qu'au filtre.
+        fixed_debut = ["Ref Client", "Nom Client", "Commercial", "A Nouveau"]
+        fixed_fin = ["En Cours", "Totale"]
+        mois_cols = [c for c in df.columns if c not in fixed_debut + fixed_fin + ["Code Commercial"]]
+        available_cols = [c for c in fixed_debut + mois_cols + fixed_fin if c in df.columns]
+        df_show = df[available_cols]
+
+        st.session_state['df_tab3'] = df_show
+    else:
+        st.session_state['df_tab3'] = pd.DataFrame()
 
     df_t3 = st.session_state.get('df_tab3')
     if df_t3 is None or df_t3.empty:
         st.info("Aucune donnée de balance trouvée.")
 
     if df_t3 is not None and not df_t3.empty:
+        sub_t3 = f"Généré le {date.today().isoformat()}"
+        if commercial_t3 != "Tout":
+            sub_t3 += f" - Commercial : {commercial_t3}"
         with col_btn2:
             st.download_button(
                 label="Télécharger Excel",
@@ -538,24 +565,24 @@ with tab3:
             st.download_button(
                 label="Télécharger PDF",
                 data=export_df_to_pdf(
-                    df_t3, 
-                    title="Balance par Clients", 
-                    subtitle=f"Généré le {date.today().isoformat()}"
+                    df_t3,
+                    title="Balance par Clients",
+                    subtitle=sub_t3
                 ),
                 file_name=f"Balance_Clients_{date.today().isoformat()}.pdf",
                 type="primary",
                 mime="application/pdf"
             )
-            
+
         # Format columns dynamically (toutes sauf les identifiants sont numériques)
-        numeric_cols = [c for c in df_t3.columns if c not in ("Ref Client", "Nom Client")]
+        numeric_cols = [c for c in df_t3.columns if c not in ("Ref Client", "Nom Client", "Commercial")]
         format_dict = {col: "{:,.2f}" for col in numeric_cols if col in df_t3.columns}
-        
+
         st.markdown("**la balance générale :**")
-        # Table des totaux
+        # Table des totaux (nombre de clients distincts : un client peut avoir une ligne par commercial)
         sums = df_t3[[c for c in numeric_cols if c in df_t3.columns]].sum()
         df_sums = pd.DataFrame([sums])
-        df_sums.insert(0, "Nom Client", len(df_t3))
+        df_sums.insert(0, "Nom Client", df_t3["Ref Client"].nunique())
         
         show_table(df_sums.style.format(format_dict))
         
@@ -1022,20 +1049,23 @@ with tab9:
         fetch_balance_agee.clear()
 
     with st.spinner("Génération de la balance âgée..."):
-        data = fetch_balance_agee()
-        if data:
-            df = pd.DataFrame(data)
+        data = fetch_balance_agee(client_schema)
+    df_agee = pd.DataFrame(data) if data else pd.DataFrame()
+    df_agee, commercial_t9 = filtre_commercial(df_agee, "commercial_balance_agee")
 
-            if 'Nom Client' in df.columns:
-                df['Nom Client'] = df['Nom Client'].replace({0: "Non Identifier", "0": "Non Identifier", "": "Non Identifier"})
+    if not df_agee.empty:
+        df = df_agee
 
-            desired_cols = ["Ref Client", "Nom Client", "0-60j", "60-90j", "90-120j", "+120j", "Totale"]
-            available_cols = [c for c in desired_cols if c in df.columns]
-            df_show = df[available_cols]
+        if 'Nom Client' in df.columns:
+            df['Nom Client'] = df['Nom Client'].replace({0: "Non Identifier", "0": "Non Identifier", "": "Non Identifier"})
 
-            st.session_state['df_tab9'] = df_show
-        else:
-            st.session_state['df_tab9'] = pd.DataFrame()
+        desired_cols = ["Ref Client", "Nom Client", "Commercial", "0-60j", "60-90j", "90-120j", "+120j", "Totale"]
+        available_cols = [c for c in desired_cols if c in df.columns]
+        df_show = df[available_cols]
+
+        st.session_state['df_tab9'] = df_show
+    else:
+        st.session_state['df_tab9'] = pd.DataFrame()
 
     df_t9 = st.session_state.get('df_tab9')
     if df_t9 is None or df_t9.empty:
@@ -1045,18 +1075,21 @@ with tab9:
         numeric_cols = ["0-60j", "60-90j", "90-120j", "+120j", "Totale"]
         format_dict = {col: "{:,.2f}" for col in numeric_cols if col in df_t9.columns}
 
+        sub_t9 = f"Généré le {date.today().isoformat()}"
+        if commercial_t9 != "Tout":
+            sub_t9 += f" - Commercial : {commercial_t9}"
         render_export_buttons(
             df_t9,
             filename_base=f"Balance_Agee_{date.today().isoformat()}",
             pdf_section_title="Balance Âgée par Clients",
             pdf_title="Rapport Balance Âgée",
-            pdf_subtitle=f"Généré le {date.today().isoformat()}",
+            pdf_subtitle=sub_t9,
         )
 
         st.markdown("**Balance âgée générale :**")
         sums = df_t9[[c for c in numeric_cols if c in df_t9.columns]].sum()
         df_sums = pd.DataFrame([sums])
-        df_sums.insert(0, "Nom Client", len(df_t9))
+        df_sums.insert(0, "Nom Client", df_t9["Ref Client"].nunique())
         show_table(df_sums.style.format(format_dict))
 
         st.markdown("**Détail de la balance âgée :**")

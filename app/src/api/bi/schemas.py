@@ -95,7 +95,10 @@ class RapportCARequest(BaseBIRequest):
 
 class BalanceClientRequest(BaseBIRequest):
     # Pas de date spécifique car le filtre de date est géré automatiquement (jusqu'à la date du jour)
-    pass
+    co_no: List[int] = Field(
+        default_factory=list,
+        description="Filtre commercial (F_DOCENTETE.co_no) — 0 = Non identifié ; vide = tous",
+    )
 
 
 class RapportVisiteClientRequest(BaseBIRequest):
