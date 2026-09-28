@@ -8,12 +8,13 @@ import streamlit as st
 import pandas as pd
 from components.styles_initiale import apply_custom_css
 from components.data_tables import show_df
+from components.date_filters import date_range_filter
 from components.auth_guard import require_auth, handle_auth_error, require_api_health
 
 apply_custom_css()
 require_auth()
 
-from services.documents_service import get_documents_ligne
+from services.documents_service import get_documents_ligne, get_date_bounds
 from services.reglements_service import get_formatted_reglements
 
 st.header("Règlements & Flux Financiers")
@@ -35,14 +36,13 @@ with st.expander("🔍 Filtres de recherche", expanded=True):
     with col3:
         search_intitule = st.text_input("Recherche Raison Sociale", help="Filtre sur la raison sociale", key="intitule_reglements")
         
-    col4, col5 = st.columns(2)
-    _today = datetime.date.today()
-    _oldest = datetime.date(2000, 1, 1)
-    with col4:
-        date_from = st.date_input("Date début", value=_oldest, key="df_reglements")
-    with col5:
-        date_to = st.date_input("Date fin", value=_today, key="dt_reglements")
-        
+    # Bornes globales des deux onglets : factures clients (6) et fournisseurs (16), date de l'entête
+    rg_min, rg_max = get_date_bounds(client_schema, "reglement", [0, 1], [6, 16])
+    date_from, date_to, dates_ok = date_range_filter(
+        "df_reglements", "dt_reglements", rg_min, rg_max,
+        default_from=datetime.date(2000, 1, 1), default_to=datetime.date.today(),
+    )
+
     rg_typereg = None
 
     st.button(
@@ -52,6 +52,9 @@ with st.expander("🔍 Filtres de recherche", expanded=True):
         key="btn_reglements",
         disabled=st.session_state.get("loading_reglements", False)
     )
+
+if not dates_ok:
+    st.stop()
 
 _date_from_str = str(date_from) if date_from else None
 _date_to_str = str(date_to) if date_to else None

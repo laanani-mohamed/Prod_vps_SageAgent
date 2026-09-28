@@ -3,11 +3,36 @@ Dash/services/documents_service.py
 Service Streamlit pour le module Documents (Ventes, Achats, etc.)
 """
 from __future__ import annotations
+import datetime
 from typing import Optional
 import pandas as pd
+import streamlit as st
 
 from services.base import call_api
 from config import SOURCE_TYPE
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def get_date_bounds(
+    client_schema: str,
+    table: str = "docentete",
+    domaine: Optional[list[int]] = None,
+    do_type: Optional[list[int]] = None,
+    ar_ref: Optional[list[str]] = None,
+) -> tuple[Optional[datetime.date], Optional[datetime.date]]:
+    """(date_min, date_max) de do_date du document ciblé ; (None, None) si indisponible."""
+    if not client_schema:
+        return None, None
+    payload = {
+        "client_schema": client_schema, "source_type": SOURCE_TYPE, "table": table,
+        "do_domaine": domaine or [], "do_type": do_type or [], "ar_ref": ar_ref or [],
+    }
+    try:
+        row = (call_api("/api/referentiel/date-range", payload).get("data") or [{}])[0]
+    except Exception:
+        return None, None
+    to_date = lambda v: datetime.date.fromisoformat(v) if v else None
+    return to_date(row.get("date_min")), to_date(row.get("date_max"))
 
 
 # --- LAYER: API ---
@@ -55,6 +80,17 @@ def get_documents_ligne(
 
 # --- LAYER: BUSINESS ---
 
+def commercial_label(co_no, co_nom, co_prenom) -> str:
+    """Libellé d'un commercial F_DOCENTETE ; co_no absent ou 0 → 'Non identifié'."""
+    try:
+        if co_no is None or pd.isna(co_no) or int(co_no) == 0:
+            return "Non identifié"
+    except (TypeError, ValueError):
+        return "Non identifié"
+    nom = " ".join(str(p).strip() for p in (co_nom, co_prenom) if p is not None and not pd.isna(p) and str(p).strip())
+    return nom or f"Commercial {int(co_no)}"
+
+
 def get_formatted_documents(
     client_schema: str,
     domaine: int,  # 0 = Ventes, 1 = Achats
@@ -65,7 +101,8 @@ def get_formatted_documents(
     search_intitule: str = "",
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
-    unpaid_only: bool = False
+    unpaid_only: bool = False,
+    co_no: Optional[int] = None,
 ) -> pd.DataFrame:
     """
     Récupère et formate les documents de vente ou d'achat.
@@ -104,6 +141,8 @@ def get_formatted_documents(
         api_filters["do_tiers"] = [search_tiers]
     if unpaid_only:
         api_filters["montant_regle_unpaid"] = True
+    if co_no is not None:
+        api_filters["co_no"] = [co_no]
 
     # Si on est en mode live/database, on peut passer do_type en filtre à l'API pour limiter la requête
     do_type_api = None
@@ -127,7 +166,7 @@ def get_formatted_documents(
     intitule_label = "CLIENT INTITULE" if domaine == 0 else "FOURNISSEUR INTITULE"
     
     cols_order = [
-        "N PIECE", "DATE PIECE", code_label, intitule_label,
+        "N PIECE", "DATE PIECE", "COMMERCIAL", code_label, intitule_label,
         "MONTANT HT", "MONTANT TVA", "MONTANT TTC", "RESTE A PAYER"
     ]
     
@@ -179,6 +218,11 @@ def get_formatted_documents(
     # 2. Calcul du Reste à payer
     df["RESTE A PAYER"] = df["do_totalttc"] - df["do_montantregle"]
 
+    df["COMMERCIAL"] = [
+        commercial_label(r.get("co_no"), r.get("co_nom"), r.get("co_prenom"))
+        for r in df.to_dict("records")
+    ]
+
     # 3. Formater la date (garder uniquement YYYY-MM-DD)
     if "do_date_str" in df.columns:
         df["do_date"] = df["do_date_str"]
@@ -191,6 +235,7 @@ def get_formatted_documents(
     rename_map = {
         "do_piece": "N PIECE",
         "do_date": "DATE PIECE",
+        "COMMERCIAL": "COMMERCIAL",
         "do_tiers": code_label,
         "ct_intitule": intitule_label,
         "do_totalht": "MONTANT HT",

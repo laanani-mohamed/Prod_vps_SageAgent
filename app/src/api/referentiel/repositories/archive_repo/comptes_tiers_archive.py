@@ -43,7 +43,10 @@ class ArchiveComptesTiersRepository(BaseReferentielRepository):
             if df_reg is not None and df_ent is not None:
                 df_reg = df_reg.filter(pl.col("do_piece").is_not_null())
                 df_ent = df_ent.filter(pl.col("do_piece").is_not_null() & pl.col("do_tiers").is_not_null())
-                df_reg_ent = df_reg.join(df_ent.select(["do_piece", "do_tiers"]), on="do_piece", how="inner")
+                df_reg_ent = df_reg.join(
+                    df_ent.select(["do_domaine", "do_type", "do_piece", "do_tiers"]),
+                    on=["do_domaine", "do_type", "do_piece"], how="inner",
+                )
                 
                 df_modes = df_reg_ent.filter(
                     pl.col("rg_typereg").is_not_null() & (pl.col("rg_typereg") != "")

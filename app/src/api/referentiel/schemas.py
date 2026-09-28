@@ -448,3 +448,21 @@ class ReglementRequest(BaseReferentielRequest):
     date_to: Optional[str] = Field(None, description="Date document <= YYYY-MM-DD")
 
 
+class DateRangeRequest(BaseReferentielRequest):
+    """Bornes (min, max) de do_date pour borner les filtres de date du dashboard."""
+    table: Optional[str] = Field(
+        "docentete",
+        description="'docentete' (F_DOCENTETE) | 'docligne' (F_DOCLIGNE) | 'reglement' (F_REGLECH, date de l'entête)",
+    )
+    do_domaine: List[int] = Field(default_factory=list, description="Domaine(s) : 0=Vente, 1=Achat, 2=Stock")
+    do_type: List[int] = Field(default_factory=list, description="Type(s) de document")
+    ar_ref: List[str] = Field(default_factory=list, description="Article(s), table 'docligne' uniquement")
+
+    @field_validator("table")
+    @classmethod
+    def validate_table(cls, v):
+        if v not in (None, "docentete", "docligne", "reglement"):
+            raise ValueError("table doit valoir 'docentete', 'docligne' ou 'reglement'")
+        return v
+
+

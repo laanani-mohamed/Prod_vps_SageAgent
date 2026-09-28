@@ -22,6 +22,7 @@ SELECT r.rg_no, r.dr_no, r.do_domaine, r.do_type, r.do_piece, r.rc_montant, r.rg
        e.do_date, e.do_tiers, c.ct_intitule, c.ct_identifiant
 FROM {schema}.f_reglech r
 LEFT JOIN {schema}.f_docentete e ON r.do_piece = e.do_piece
+  AND r.do_domaine = e.do_domaine AND r.do_type = e.do_type
 LEFT JOIN {schema}.f_comptet c ON e.do_tiers = c.ct_num
 WHERE 1=1""".strip()
 

@@ -1,5 +1,7 @@
 import streamlit as st
 
+from components.styles_initiale import apply_table_scrollbar_css
+
 def apply_fichier_base_css():
     """Applique le style vibrant pour le sidebar et les KPIs (inspiré du design UI fourni)."""
     st.markdown("""
@@ -77,6 +79,7 @@ def apply_fichier_base_css():
         div.st-key-kpi1 [data-testid="stProgress"] > div > div {
             background-color: white !important;
         }
-        
+
         </style>
     """, unsafe_allow_html=True)
+    apply_table_scrollbar_css()

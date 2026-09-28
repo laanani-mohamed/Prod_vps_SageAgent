@@ -9,8 +9,9 @@ import streamlit as st
 import pandas as pd
 
 from components.data_tables import show_df
+from components.date_filters import date_range_filter
 from components.auth_guard import handle_auth_error
-from services.documents_service import get_documents_entete, get_documents_ligne, get_formatted_documents
+from services.documents_service import get_documents_entete, get_documents_ligne, get_formatted_documents, commercial_label
 
 
 def render_gestion_documents_page(
@@ -41,36 +42,63 @@ def render_gestion_documents_page(
     with st.expander("🔍 Filtres de recherche", expanded=True):
         @st.cache_data(ttl=300, show_spinner=False)
         def fetch_filter_options(schema):
+            empty = (["Tout"], ["Tout"], ["Tout"], {}, None, None)
             if not schema:
-                return ["Tout"], ["Tout"], ["Tout"]
+                return empty
             try:
                 docs = get_documents_entete(schema, domaine=[domaine])
                 if not docs:
-                    return ["Tout"], ["Tout"], ["Tout"]
+                    return empty
                 df = pd.DataFrame(docs)
                 pieces = ["Tout"] + sorted([str(x) for x in df["do_piece"].dropna().unique() if str(x).strip()]) if "do_piece" in df.columns else ["Tout"]
                 tiers = ["Tout"] + sorted([str(x) for x in df["do_tiers"].dropna().unique() if str(x).strip()]) if "do_tiers" in df.columns else ["Tout"]
                 intitules = ["Tout"] + sorted([str(x) for x in df["ct_intitule"].dropna().unique() if str(x).strip()]) if "ct_intitule" in df.columns else ["Tout"]
-                return pieces, tiers, intitules
+
+                commerciaux = {}
+                if "co_no" in df.columns:
+                    co_cols = [c for c in ("co_no", "co_nom", "co_prenom") if c in df.columns]
+                    for r in df[co_cols].drop_duplicates().to_dict("records"):
+                        try:
+                            co_no = 0 if pd.isna(r["co_no"]) else int(r["co_no"])
+                        except (TypeError, ValueError):
+                            continue
+                        label = commercial_label(co_no, r.get("co_nom"), r.get("co_prenom"))
+                        if label in commerciaux and commerciaux[label] != co_no:
+                            label = f"{label} ({co_no})"
+                        commerciaux[label] = co_no
+
+                date_min = date_max = None
+                if "do_date" in df.columns:
+                    dates = pd.to_datetime(df["do_date"].astype(str).str[:10], errors="coerce").dropna()
+                    if not dates.empty:
+                        date_min, date_max = dates.min().date(), dates.max().date()
+
+                return pieces, tiers, intitules, commerciaux, date_min, date_max
             except Exception:
-                return ["Tout"], ["Tout"], ["Tout"]
+                return empty
 
-        pieces_opts, tiers_opts, intitule_opts = fetch_filter_options(client_schema)
+        pieces_opts, tiers_opts, intitule_opts, commerciaux, date_min, date_max = fetch_filter_options(client_schema)
 
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3, col4 = st.columns(4)
         with col1:
             search_piece = st.selectbox("Recherche N° Pièce", options=pieces_opts, help="Numéro exact du document", key=f"piece_{key_ns}")
         with col2:
             search_tiers = st.selectbox(code_label, options=tiers_opts, help=f"Filtre sur le code {tiers_logical}", key=f"tiers_{key_ns}")
         with col3:
             search_intitule = st.selectbox(intitule_label, options=intitule_opts, help=f"Filtre sur le nom du {tiers_logical}", key=f"intitule_{key_ns}")
-
-        col4, col5, col6 = st.columns([1, 1, 2])
         with col4:
-            date_from = st.date_input("Date début", value=None, key=f"df_{key_ns}")
-        with col5:
-            date_to = st.date_input("Date fin", value=None, key=f"dt_{key_ns}")
-        with col6:
+            search_commercial = st.selectbox(
+                "Commercial",
+                options=["Tout"] + sorted(commerciaux),
+                help="Commercial (collaborateur) porté par le document",
+                key=f"commercial_{key_ns}",
+            )
+
+        col5, col6, col7 = st.columns([1, 1, 2])
+        date_from, date_to, dates_ok = date_range_filter(
+            f"df_{key_ns}", f"dt_{key_ns}", date_min, date_max, cols=(col5, col6)
+        )
+        with col7:
             st.write("")  # Espacement pour aligner verticalement
             st.write("")
             unpaid_only = st.checkbox("Non réglés uniquement (Reste > 0)", key=f"unpaid_{key_ns}")
@@ -82,6 +110,9 @@ def render_gestion_documents_page(
             key=f"btn_{key_ns}",
             disabled=st.session_state.get(f"loading_{key_ns}", False)
         )
+
+    if not dates_ok:
+        return
 
     tabs = st.tabs(tab_labels)
 
@@ -99,7 +130,8 @@ def render_gestion_documents_page(
                         search_intitule="" if search_intitule == "Tout" else search_intitule,
                         date_from=date_from.strftime("%Y-%m-%d") if date_from else None,
                         date_to=date_to.strftime("%Y-%m-%d") if date_to else None,
-                        unpaid_only=unpaid_only
+                        unpaid_only=unpaid_only,
+                        co_no=commerciaux.get(search_commercial),
                     )
             except Exception as e:
                 handle_auth_error(e)

@@ -21,30 +21,29 @@ class PgDocLigneRepository(BaseReferentielRepository):
             "dl_cmup", "dl_nonlivre", "dl_valorise", "co_no", "co_nom",
         ]
 
-        entete_join = ""
         entete_cols = ""
         if req.with_entete:
-            entete_join = f"""
-LEFT JOIN {schema}.f_docentete e ON l.do_piece = e.do_piece
-  AND l.do_domaine = e.do_domaine"""
             entete_cols = """,
        e.do_totalht, e.do_totalttc,
        COALESCE(e.do_montantregle, 0)                                   AS do_montantregle,
        e.do_totalttc - COALESCE(e.do_montantregle, 0)                  AS reste_a_payer"""
             cols += ["do_totalht", "do_totalttc", "do_montantregle", "reste_a_payer"]
 
+        # Le commercial est celui de l'entête (F_DOCENTETE), pas celui de la ligne ni du client.
+        # (domaine, type, pièce) : seule clé unique de F_DOCENTETE.
         sql = f"""
 SELECT l.do_domaine, l.do_type, l.ct_num, c.ct_intitule,
        l.do_piece, l.dl_piecebc, l.dl_piecebl, l.do_date, l.do_ref,
        l.dl_ligne, l.ar_ref, a.ar_design AS ar_design_catalogue, l.dl_design,
        l.dl_qte, l.dl_prixunitaire, l.dl_montantht, l.dl_montantttc,
-       l.dl_cmup, l.dl_nonlivre, l.dl_valorise, l.co_no, col.co_nom
+       l.dl_cmup, l.dl_nonlivre, l.dl_valorise, e.co_no, col.co_nom
        {entete_cols}
 FROM {schema}.f_docligne l
+LEFT JOIN {schema}.f_docentete e ON e.do_domaine = l.do_domaine
+  AND e.do_type = l.do_type AND e.do_piece = l.do_piece
 LEFT JOIN {schema}.f_comptet c ON l.ct_num = c.ct_num
 LEFT JOIN {schema}.f_article a ON l.ar_ref = a.ar_ref
-LEFT JOIN {schema}.f_collaborateur col ON l.co_no = col.co_no
-{entete_join}
+LEFT JOIN {schema}.f_collaborateur col ON e.co_no = col.co_no
 WHERE 1=1""".strip()
 
         sql = add_in(sql, "l.do_domaine", req.do_domaine, params)
@@ -52,7 +51,7 @@ WHERE 1=1""".strip()
         sql = add_in(sql, "l.do_piece", req.do_piece, params)
         sql = add_in(sql, "l.ar_ref", req.ar_ref, params)
         sql = add_in(sql, "l.ct_num", req.ct_num, params)
-        sql = add_in(sql, "l.co_no", req.co_no, params)
+        sql = add_in(sql, "e.co_no", req.co_no, params)
         sql = add_ilike(sql, "l.dl_design", req.dl_design, params)
         sql = add_eq(sql, "l.pf_num", req.pf_num, params)
         sql = add_eq(sql, "l.do_date", req.do_date, params)

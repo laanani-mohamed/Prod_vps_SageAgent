@@ -16,6 +16,7 @@ from api.referentiel.repositories.pg_repo.doc_entete_repo import PgDocEnteteRepo
 from api.referentiel.repositories.pg_repo.doc_ligne_repo import PgDocLigneRepository
 from api.referentiel.repositories.pg_repo.stock_depot_repo import PgStockDepotRepository
 from api.referentiel.repositories.pg_repo.reglement_repo import PgReglementRepository
+from api.referentiel.repositories.pg_repo.date_range_repo import PgDateRangeRepository
 
 # Imports Archive
 from api.referentiel.repositories.archive_repo.comptes_tiers_archive import ArchiveComptesTiersRepository
@@ -27,6 +28,7 @@ from api.referentiel.repositories.archive_repo.doc_entete_archive import Archive
 from api.referentiel.repositories.archive_repo.doc_ligne_archive import ArchiveDocLigneRepository
 from api.referentiel.repositories.archive_repo.stock_depot_archive import ArchiveStockDepotRepository
 from api.referentiel.repositories.archive_repo.reglement_archive import ArchiveReglementRepository
+from api.referentiel.repositories.archive_repo.date_range_archive import ArchiveDateRangeRepository
 
 
 RESOURCE_MAP = {
@@ -65,6 +67,10 @@ RESOURCE_MAP = {
     "reglement": {
         "db_latest": PgReglementRepository,
         "archive": ArchiveReglementRepository,
+    },
+    "date_range": {
+        "db_latest": PgDateRangeRepository,
+        "archive": ArchiveDateRangeRepository,
     },
 }
 

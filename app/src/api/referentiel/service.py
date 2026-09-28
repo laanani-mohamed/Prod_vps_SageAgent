@@ -21,6 +21,7 @@ from api.referentiel.use_cases import (
     doc_ligne_uc,
     stock_depot_uc,
     reglement_uc,
+    date_range_uc,
 )
 
 logger = logging.getLogger("api.referentiel.service")
@@ -39,6 +40,7 @@ RESOURCE_HANDLERS: dict[str, Callable[[Any], ReferentielResponse]] = {
     "/api/referentiel/documents-ligne": doc_ligne_uc.execute,
     "/api/referentiel/stock-depot": stock_depot_uc.execute,
     "/api/referentiel/reglements": reglement_uc.execute,
+    "/api/referentiel/date-range": date_range_uc.execute,
 }
 
 def get_specific(req: Any, endpoint: str) -> ReferentielResponse:

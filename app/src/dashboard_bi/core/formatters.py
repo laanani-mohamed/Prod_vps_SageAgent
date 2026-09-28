@@ -25,10 +25,10 @@ def format_montant_mmad(val: Optional[float]) -> str:
     return format_montant(val, unit="MMAD", decimals=2)
 
 def format_date(val: Optional[str]) -> str:
-    """YYYY-MM-DD HH:MM:SS -> YYYY-MM-DD"""
+    """YYYY-MM-DD HH:MM:SS (ou ISO avec 'T') -> YYYY-MM-DD"""
     if not val or val == "-":
         return "-"
-    return str(val).split(" ")[0]
+    return str(val).split(" ")[0].split("T")[0]
 
 def format_datetime_minute(val: Optional[str]) -> str:
     """Horodatage ISO (ex: '2026-09-17T10:36:48.117130+00:00') -> 'JJ/MM/AAAA HH:MM'."""

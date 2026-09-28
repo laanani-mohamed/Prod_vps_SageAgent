@@ -30,7 +30,7 @@ class PgBIRapportCARepository(BaseBIRepository):
             "do_domaine", "do_type", "do_date",
             "do_totalht", "do_piece",
             "do_tiers", "ct_intitule",
-            "ct_ville",
+            "ct_coderegion",
             "co_no", "co_fullname",
         ]
 
@@ -43,11 +43,14 @@ SELECT
     e.do_piece,
     e.do_tiers,
     ct.ct_intitule,
-    ct.ct_ville,
+    COALESCE(NULLIF(UPPER(TRIM(ct.ct_coderegion)), ''), 'NON RENSEIGNÉE') AS ct_coderegion,
     e.co_no,
-    CASE 
-        WHEN e.co_no = 0 THEN 'Non identifier' 
-        ELSE COALESCE(col.co_nom || ' ' || col.co_prenom, 'Non identifier') 
+    CASE
+        WHEN COALESCE(e.co_no, 0) = 0 THEN 'Non identifié'
+        ELSE COALESCE(
+            NULLIF(CONCAT_WS(' ', NULLIF(TRIM(col.co_nom), ''), NULLIF(TRIM(col.co_prenom), '')), ''),
+            'Commercial ' || e.co_no
+        )
     END AS co_fullname
 FROM {schema}.f_docentete e
 LEFT JOIN {schema}.f_comptet ct ON ct.ct_num = e.do_tiers

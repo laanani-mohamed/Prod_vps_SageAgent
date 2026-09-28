@@ -1,5 +1,27 @@
 import streamlit as st
 
+# Streamlit impose `* { scrollbar-width: thin; scrollbar-color: transparent }` : barres quasi invisibles.
+# .dvn-scroller est le conteneur scrollable réel de st.dataframe (glide-data-grid).
+TABLE_SCROLLBAR_CSS = """
+    <style>
+    div[data-testid="stDataFrame"] .dvn-scroller {
+        scrollbar-width: auto;
+        scrollbar-color: #94a3b8 #f1f5f9;
+    }
+    /* Safari (pas de support scrollbar-color) */
+    div[data-testid="stDataFrame"] .dvn-scroller::-webkit-scrollbar { width: 14px; height: 14px; }
+    div[data-testid="stDataFrame"] .dvn-scroller::-webkit-scrollbar-track { background: #f1f5f9; }
+    div[data-testid="stDataFrame"] .dvn-scroller::-webkit-scrollbar-thumb {
+        background: #94a3b8; border-radius: 8px; border: 3px solid #f1f5f9;
+    }
+    </style>
+"""
+
+
+def apply_table_scrollbar_css():
+    st.markdown(TABLE_SCROLLBAR_CSS, unsafe_allow_html=True)
+
+
 def apply_custom_css():
     """Applique le style vibrant pour le sidebar et les KPIs (inspiré du design UI fourni)."""
     st.markdown("""
@@ -120,6 +142,7 @@ def apply_custom_css():
         div.st-key-kpi1 [data-testid="stProgress"] > div > div {
             background-color: white !important;
         }
-        
+
         </style>
     """, unsafe_allow_html=True)
+    apply_table_scrollbar_css()

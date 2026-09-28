@@ -322,7 +322,7 @@ with tab1:
                 rename_map = {"ct_intitule": "Nom Client", "ca_ht": "CA HT (MAD)"}
                 df_top_show = df_top[[c for c in rename_map.keys() if c in df_top.columns]].rename(columns=rename_map)
                 if "CA HT (MAD)" in df_top_show.columns:
-                    df_top_show["CA HT (MAD)"] = df_top_show["CA HT (MAD)"].apply(lambda x: f"{x:,.2f}")
+                    df_top_show["CA HT (MAD)"] = pd.to_numeric(df_top_show["CA HT (MAD)"], errors="coerce").astype(float)
                 show_df(df_top_show, key_suffix="top_clients_1")
             else:
                 st.info("Aucune vente enregistrée pour cette période.")
@@ -330,8 +330,8 @@ with tab1:
             df_top = pd.DataFrame(top_clients_data)
             df_top_show = pd.DataFrame({
                 "Nom Client": df_top.get("ct_intitule", df_top.get("ct_num", [])),
-                "CA HT (MAD)": df_top["ca_ht"].apply(lambda x: f"{x:,.2f}"),
-                "% du CA": df_top["pct_ca"].apply(lambda x: f"{x:.1f} %"),
+                "CA HT (MAD)": pd.to_numeric(df_top["ca_ht"], errors="coerce").astype(float),
+                "% du CA": pd.to_numeric(df_top["pct_ca"], errors="coerce").astype(float),
             })
             show_df(df_top_show, key_suffix="top_clients_2")
 
@@ -342,7 +342,7 @@ with tab2:
             df_top_f = pd.DataFrame(top_fournisseurs_data)
             df_top_f_show = pd.DataFrame({
                 "Nom Fournisseur": df_top_f.get("ct_intitule", df_top_f.get("ct_num", [])),
-                "Encours (MAD)": df_top_f.get("encours", pd.Series([0]*len(df_top_f))).apply(lambda x: f"{x:,.0f} MAD"),
+                "Encours (MAD)": pd.to_numeric(df_top_f.get("encours", pd.Series([0]*len(df_top_f))), errors="coerce").astype(float),
             })
             show_df(df_top_f_show, key_suffix="top_fournisseurs")
         else:
@@ -356,8 +356,8 @@ with tab3:
             df_fam_show = pd.DataFrame({
                 "Code Famille": df_fam["fa_codefamille"],
                 "Famille": df_fam["fa_intitule"],
-                "CA HT": df_fam["ca_ht"].apply(to_m_str),
-                "% du CA": df_fam["pct_ca"].apply(lambda x: f"{x:.1f} %"),
+                "CA HT": pd.to_numeric(df_fam["ca_ht"], errors="coerce").astype(float),
+                "% du CA": pd.to_numeric(df_fam["pct_ca"], errors="coerce").astype(float),
             })
 
             st.caption("💡 Cliquez sur une famille pour voir ses articles.")
@@ -385,7 +385,7 @@ with tab3:
                     df_arts_show = pd.DataFrame({
                         "Réf. Article": df_arts["ar_ref"],
                         "Désignation": df_arts["designation"],
-                        "CA HT": df_arts["ca_ht"].apply(to_m_str),
+                        "CA HT": pd.to_numeric(df_arts["ca_ht"], errors="coerce").astype(float),
                     })
                     show_df(df_arts_show, key_suffix=f"arts_{fa_code}")
                     st.caption(f"{len(df_arts)} article(s) avec CA > 0")

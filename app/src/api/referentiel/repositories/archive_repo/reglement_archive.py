@@ -15,10 +15,10 @@ class ArchiveReglementRepository(BaseReferentielRepository):
         df_tiers = load_archive_file(archive_dir, "F_COMPTET", ts)
 
         if df_doc is not None:
-            # On joint sur do_piece pour récupérer la date du document (do_date) et le code tiers (do_tiers)
+            # Clé unique de l'entête : (domaine, type, pièce) → date du document et code tiers
             df = df.join(
-                df_doc.select(["do_piece", "do_date", "do_tiers"]),
-                on="do_piece",
+                df_doc.select(["do_domaine", "do_type", "do_piece", "do_date", "do_tiers"]),
+                on=["do_domaine", "do_type", "do_piece"],
                 how="left"
             )
 

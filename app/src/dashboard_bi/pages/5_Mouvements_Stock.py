@@ -8,12 +8,14 @@ import pandas as pd
 import datetime
 from components.styles_initiale import apply_custom_css
 from components.data_tables import show_df
+from components.date_filters import date_range_filter
 from components.auth_guard import require_auth, handle_auth_error, require_api_health
 
 apply_custom_css()
 require_auth()
 
 from services.stock_service import get_stock_availability, get_stock_insights, get_mouvements_entrants, get_mouvements_sortants
+from services.documents_service import get_date_bounds
 from services.referentiel_service import get_familles, get_depots
 
 st.header("Stock & Mouvements")
@@ -24,8 +26,8 @@ require_api_health()
 # Rendu commun aux onglets Mouvements Entrants / Sortants
 # ---------------------------------------------------------------------------
 _MOUVEMENT_LABELS = {
-    "entrant": {"title": "Entrants", "adj": "entrante", "empty_adj": "entrant", "key": "ent"},
-    "sortant": {"title": "Sortants", "adj": "sortante", "empty_adj": "sortant", "key": "sort"},
+    "entrant": {"title": "Entrants", "adj": "entrante", "empty_adj": "entrant", "key": "ent", "do_type": 21},
+    "sortant": {"title": "Sortants", "adj": "sortante", "empty_adj": "sortant", "key": "sort", "do_type": 20},
 }
 
 
@@ -36,13 +38,16 @@ def render_mouvements_tab(direction: str, fetch_fn, client_schema: str, search_r
     st.subheader(f"Mouvements {labels['title']}")
 
     with st.expander("🔍 Filtres de date", expanded=True):
-        c1, c2 = st.columns(2)
-        with c1:
-            today = datetime.date.today()
-            date_from = st.date_input("Date début", value=today.replace(month=1, day=1), key=f"{key}_date_from")
-        with c2:
-            date_to = st.date_input("Date fin", value=today, key=f"{key}_date_to")
+        today = datetime.date.today()
+        d_min, d_max = get_date_bounds(client_schema, "docentete", [2], [labels["do_type"]])
+        date_from, date_to, dates_ok = date_range_filter(
+            f"{key}_date_from", f"{key}_date_to", d_min, d_max,
+            default_from=today.replace(month=1, day=1), default_to=today,
+        )
         st.button("▶ Appliquer", type="primary", use_container_width=True, key=f"btn_{key}")
+
+    if not dates_ok:
+        return
 
     with st.spinner(f"Chargement des mouvements {labels['title'].lower()}..."):
         df_mvt = fetch_fn(
@@ -317,7 +322,7 @@ with tab4:
             
             # Formatage de la date de dernière vente
             if "Dernière Vente" in df_ins_show.columns:
-                df_ins_show["Dernière Vente"] = pd.to_datetime(df_ins_show["Dernière Vente"], errors="coerce").dt.strftime("%d/%m/%Y")
+                df_ins_show["Dernière Vente"] = pd.to_datetime(df_ins_show["Dernière Vente"], errors="coerce").dt.strftime("%Y-%m-%d")
                 df_ins_show["Dernière Vente"] = df_ins_show["Dernière Vente"].fillna("-")
             
             # Formatage des Jours d'inactivité

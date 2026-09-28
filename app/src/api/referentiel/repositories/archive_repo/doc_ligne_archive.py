@@ -24,8 +24,6 @@ class ArchiveDocLigneRepository(BaseReferentielRepository):
             df = df.filter(pl.col("ar_ref").is_in(req.ar_ref))
         if req.ct_num:
             df = df.filter(pl.col("ct_num").is_in(req.ct_num))
-        if req.co_no:
-            df = df.filter(pl.col("co_no").cast(pl.Int64).is_in(req.co_no))
         if req.do_date:
             df = df.filter(pl.col("do_date").cast(pl.Utf8) == req.do_date)
         if req.date_from:
@@ -44,27 +42,33 @@ class ArchiveDocLigneRepository(BaseReferentielRepository):
         df_tiers = load_archive_file(archive_dir, "F_COMPTET", ts)
         df_art = load_archive_file(archive_dir, "F_ARTICLE", ts)
         df_col = load_archive_file(archive_dir, "F_COLLABORATEUR", ts)
+        df_entete = load_archive_file(archive_dir, "F_DOCENTETE", ts)
+
+        # Le commercial est celui de l'entête (F_DOCENTETE), jointe sur sa clé unique (domaine, type, pièce)
+        keys = ["do_domaine", "do_type", "do_piece"]
+        df = df.drop("co_no", strict=False).with_columns([pl.col(k).cast(pl.Utf8) for k in keys])
+        if df_entete is not None:
+            pieces = df.select("do_piece").unique().to_series().to_list()
+            entete_cols = keys + ["co_no"] + (["do_totalht", "do_totalttc", "do_montantregle"] if req.with_entete else [])
+            df_entete = (
+                df_entete.filter(pl.col("do_piece").cast(pl.Utf8).is_in(pieces))
+                .select(entete_cols)
+                .with_columns([pl.col(k).cast(pl.Utf8) for k in keys + ["co_no"]])
+            )
+            df = df.join(df_entete, on=keys, how="left")
+        else:
+            df = df.with_columns(pl.lit(None, dtype=pl.Utf8).alias("co_no"))
+
+        if req.co_no:
+            df = df.filter(pl.col("co_no").cast(pl.Int64, strict=False).is_in(req.co_no))
 
         if df_tiers is not None:
             df = df.join(df_tiers.select(["ct_num", "ct_intitule"]), on="ct_num", how="left")
         if df_art is not None:
             df = df.join(df_art.select(["ar_ref", "ar_design"]).rename({"ar_design": "ar_design_catalogue"}), on="ar_ref", how="left")
         if df_col is not None:
-            df = df.join(df_col.select(["co_no", "co_nom"]), on="co_no", how="left")
-
-        if req.with_entete:
-            df_entete = load_archive_file(archive_dir, "F_DOCENTETE", ts)
-            if df_entete is not None:
-                pieces = df.select("do_piece").unique().to_series().to_list()
-                df_entete = df_entete.filter(pl.col("do_piece").is_in(pieces))
-                df_entete = df_entete.select([
-                    "do_piece", "do_domaine", "do_totalht", "do_totalttc", "do_montantregle"
-                ])
-                df = df.join(
-                    df_entete.drop("do_domaine"),
-                    on="do_piece",
-                    how="left"
-                )
+            df = df.join(df_col.select(["co_no", "co_nom"]).with_columns(pl.col("co_no").cast(pl.Utf8)),
+                         on="co_no", how="left")
 
         if req.dl_qte_min is not None:
             df = df.filter(pl.col("dl_qte").cast(pl.Float64) >= req.dl_qte_min)

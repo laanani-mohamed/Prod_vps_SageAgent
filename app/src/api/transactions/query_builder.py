@@ -115,7 +115,7 @@ def build_select(req: TransactionsRequest) -> Tuple[List[str], List[str], bool, 
 def build_joins(schema: str, need_ligne: bool) -> str:
     joins = []
     if need_ligne:
-        joins.append(f"JOIN {schema}.f_docligne l ON l.do_piece = e.do_piece AND l.do_domaine = e.do_domaine")
+        joins.append(f"JOIN {schema}.f_docligne l ON l.do_piece = e.do_piece AND l.do_domaine = e.do_domaine AND l.do_type = e.do_type")
     return "\n".join(joins)
 
 

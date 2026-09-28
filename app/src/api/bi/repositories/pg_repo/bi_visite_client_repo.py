@@ -88,6 +88,7 @@ SELECT
     e.do_type
 FROM {schema}.f_docligne l
 JOIN {schema}.f_docentete e ON e.do_piece = l.do_piece
+  AND e.do_domaine = l.do_domaine AND e.do_type = l.do_type
 WHERE e.do_domaine = 0
   AND e.do_type IN (6, 7)
   AND e.do_tiers = %s
@@ -112,6 +113,7 @@ SELECT
     MAX(CAST(e.do_date AS TEXT)) AS last_date
 FROM {schema}.f_docligne l
 JOIN {schema}.f_docentete e ON e.do_piece = l.do_piece
+  AND e.do_domaine = l.do_domaine AND e.do_type = l.do_type
 LEFT JOIN {schema}.f_article  a ON a.ar_ref = l.ar_ref
 LEFT JOIN {schema}.f_famille  f ON f.fa_codefamille = a.fa_codefamille
 WHERE e.do_domaine = 0

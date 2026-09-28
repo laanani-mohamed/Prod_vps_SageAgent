@@ -2,7 +2,6 @@
 Dash/pages/7_Rapports.py
 Page 7 — Rapports BI
 """
-import io
 import streamlit as st
 import pandas as pd
 from datetime import date, timedelta
@@ -10,8 +9,11 @@ import httpx
 
 from components.styles_initiale import apply_custom_css
 from components.auth_guard import require_auth, handle_auth_error
+from components.data_tables import show_table
+from components.date_filters import date_range_filter
+from services.documents_service import get_date_bounds
 from config import API_BASE_URL, SOURCE_TYPE
-from utils.exports import export_df_to_excel, export_df_to_pdf, export_visite_to_pdf
+from utils.exports import export_df_to_excel, export_df_to_pdf, export_visite_to_pdf, export_sections_to_excel
 
 
 def render_export_buttons(df: pd.DataFrame, filename_base: str, pdf_section_title: str, pdf_title: str, pdf_subtitle: str):
@@ -37,18 +39,11 @@ def render_export_buttons(df: pd.DataFrame, filename_base: str, pdf_section_titl
 
 def render_multi_export_buttons(sections: list, filename_base: str, pdf_title: str, pdf_subtitle: str):
     """Bouton Excel multi-feuilles + PDF multi-sections pour une liste de (label, DataFrame)."""
-    excel_buf = io.BytesIO()
-    with pd.ExcelWriter(excel_buf, engine="openpyxl") as writer:
-        for label, df_s in sections:
-            if df_s is not None and not df_s.empty:
-                df_s.to_excel(writer, sheet_name=label[:31], index=False)
-    excel_buf.seek(0)
-
     col_xl, col_pdf = st.columns(2)
     with col_xl:
         st.download_button(
             label="📥 Télécharger Excel",
-            data=excel_buf.getvalue(),
+            data=export_sections_to_excel(sections),
             file_name=f"{filename_base}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             type="primary",
@@ -226,22 +221,25 @@ with tab1:
     
     with col1:
         grouping = st.selectbox(
-            "Grouper par", 
+            "Grouper par",
             options=["client", "region", "commercial"],
             format_func=lambda x: "Client" if x == "client" else ("Région" if x == "region" else "Collaborateur")
         )
-    with col2:
-        d_from = st.date_input("Date début", value=date.today().replace(month=1, day=1), key="d_from_t1")
-    with col3:
-        d_to = st.date_input("Date fin", value=date.today(), key="d_to_t1")
-        
+    # Bornes : factures de vente (do_type 6, 7), documents utilisés par le rapport CA
+    ca_min, ca_max = get_date_bounds(client_schema, "docentete", [0], [6, 7])
+    d_from, d_to, dates_ok_t1 = date_range_filter(
+        "d_from_t1", "d_to_t1", ca_min, ca_max,
+        default_from=date.today().replace(month=1, day=1), default_to=date.today(),
+        cols=(col2, col3),
+    )
+
     col_btn1, col_btn2, col_btn3 = st.columns([2, 1, 1])
-    
+
     with col_btn1:
         gen_clicked = st.button(
             "Générer le rapport CA",
             type="primary",
-            disabled=st.session_state.get("loading_rapports_ca", False)
+            disabled=st.session_state.get("loading_rapports_ca", False) or not dates_ok_t1
         )
         
     if gen_clicked:
@@ -258,20 +256,18 @@ with tab1:
                 df = pd.DataFrame(data)
                 
                 # Format columns based on grouping — only rename columns that exist
+                ratio_cols = {"ca_ht": "CA HT", "nb_factures": "Nb Factures",
+                              "moyenne_facture": "Moyenne / Facture", "pct_ca": "% du CA"}
                 if grouping == "client":
-                    rename_map = {"do_tiers": "Code Client", "ct_intitule": "Nom Client", "ca_ht": "CA HT", "nb_factures": "Nb Factures"}
+                    rename_map = {"do_tiers": "Code Client", "ct_intitule": "Nom Client", **ratio_cols}
                 elif grouping == "region":
-                    rename_map = {"ct_ville": "Région", "ca_ht": "CA HT", "nb_factures": "Nb Factures"}
+                    rename_map = {"ct_coderegion": "Région", **ratio_cols}
                 elif grouping == "commercial":
-                    rename_map = {"co_no": "Code Collab.", "co_fullname": "Collaborateur", "ca_ht": "CA HT", "nb_factures": "Nb Factures"}
+                    rename_map = {"co_no": "Code Collab.", "co_fullname": "Collaborateur", **ratio_cols}
                 else:
                     rename_map = {}
                 rename_map = {k: v for k, v in rename_map.items() if k in df.columns}
                 df = df.rename(columns=rename_map)
-                
-                for col in ["Collaborateur", "Nom Collaborateur"]:
-                    if col in df.columns:
-                        df[col] = df[col].replace({0: "Non Identifier", "0": "Non Identifier", "": "Non Identifier"})
                         
                 st.session_state['df_tab1'] = df
                 st.session_state['grouping_tab1'] = grouping
@@ -313,12 +309,13 @@ with tab1:
         }])
 
         st.markdown(f"**Chiffre d'Affaire en Général :**")
-        st.dataframe(df_t1_sums.style.format({
+        show_table(df_t1_sums.style.format({
             "CA HT Total": "{:,.2f}"
         }))
         
         st.markdown("**Chiffre d'Affaire en Détail :**")
-        st.dataframe(df_t1)
+        fmt_t1 = {"CA HT": "{:,.2f}", "Moyenne / Facture": "{:,.2f}", "% du CA": "{:.2f} %"}
+        show_table(df_t1.style.format({c: f for c, f in fmt_t1.items() if c in df_t1.columns}))
 
 # ---------------------------------------------------------------------------
 # Tab 2 : Comparaison CA
@@ -327,15 +324,23 @@ with tab2:
     st.subheader("Comparaison Chiffre d'Affaire")
     
     col1, col2 = st.columns(2)
+    _today = date.today()
     with col1:
         st.markdown("**Période 1 (Référence)**")
-        d_from_1 = st.date_input("Date début P1", value=date.today().replace(year=date.today().year-1, month=1, day=1), key="d_from_1")
-        d_to_1 = st.date_input("Date fin P1", value=date.today().replace(year=date.today().year-1), key="d_to_1")
+        d_from_1, d_to_1, dates_ok_p1 = date_range_filter(
+            "d_from_1", "d_to_1", ca_min, ca_max,
+            default_from=_today.replace(year=_today.year - 1, month=1, day=1),
+            default_to=_today.replace(year=_today.year - 1, day=28 if (_today.month, _today.day) == (2, 29) else _today.day),
+            label_from="Date début P1", label_to="Date fin P1", cols=(col1, col1),
+        )
     with col2:
         st.markdown("**Période 2 (Comparée)**")
-        d_from_2 = st.date_input("Date début P2", value=date.today().replace(month=1, day=1), key="d_from_2")
-        d_to_2 = st.date_input("Date fin P2", value=date.today(), key="d_to_2")
-        
+        d_from_2, d_to_2, dates_ok_p2 = date_range_filter(
+            "d_from_2", "d_to_2", ca_min, ca_max,
+            default_from=_today.replace(month=1, day=1), default_to=_today,
+            label_from="Date début P2", label_to="Date fin P2", cols=(col2, col2),
+        )
+
     grouping_cmp = st.selectbox(
         "Grouper la comparaison par", 
         options=["client", "region", "commercial"],
@@ -345,7 +350,8 @@ with tab2:
     
     col_btn1, col_btn2, col_btn3 = st.columns([2, 1, 1])
     with col_btn1:
-        cmp_clicked = st.button("Comparer", type="primary", key="btn_compare")
+        cmp_clicked = st.button("Comparer", type="primary", key="btn_compare",
+                                disabled=not (dates_ok_p1 and dates_ok_p2))
         
     if cmp_clicked:
         with st.spinner("Comparaison en cours..."):
@@ -361,8 +367,8 @@ with tab2:
                 join_keys = ["do_tiers"]
                 col_name_mapping = {"do_tiers": "Code", "ct_intitule": "Nom"}
             elif grouping_cmp == "region":
-                join_keys = ["ct_ville"]
-                col_name_mapping = {"ct_ville": "Région"}
+                join_keys = ["ct_coderegion"]
+                col_name_mapping = {"ct_coderegion": "Région"}
             elif grouping_cmp == "commercial":
                 join_keys = ["co_no"]
                 col_name_mapping = {"co_no": "Code", "co_fullname": "Collaborateur"}
@@ -404,7 +410,7 @@ with tab2:
             
             for col in ["Nom Collaborateur", "Code"]:
                 if col in df_show.columns and grouping_cmp == "commercial":
-                    df_show[col] = df_show[col].replace({0: "Non Identifier", "0": "Non Identifier", "": "Non Identifier"})
+                    df_show[col] = df_show[col].replace({0: "Non identifié", "0": "Non identifié", "": "Non identifié"})
             
             desired_order = []
             if grouping_cmp == "client":
@@ -464,7 +470,7 @@ with tab2:
         df_cmp_sums.insert(0, "Total", len(df_t2))
 
         st.markdown("**Comparaison Générale :**")
-        st.dataframe(df_cmp_sums.style.format({
+        show_table(df_cmp_sums.style.format({
             "Total": "{:,.0f}",
             "CA P1 Total": "{:,.2f}",
             "CA P2 Total": "{:,.2f}",
@@ -474,7 +480,7 @@ with tab2:
         
             
         st.markdown("**Comparaison en Détail :**")
-        st.dataframe(df_t2.style.format({
+        show_table(df_t2.style.format({
             "CA Période 1": "{:,.2f}", 
             "CA Période 2": "{:,.2f}",
             "Ecart (MAD)": "{:,.2f}",
@@ -551,10 +557,10 @@ with tab3:
         df_sums = pd.DataFrame([sums])
         df_sums.insert(0, "Nom Client", len(df_t3))
         
-        st.dataframe(df_sums.style.format(format_dict))
+        show_table(df_sums.style.format(format_dict))
         
         st.markdown("**Détail de la balance :**")
-        st.dataframe(df_t3.style.format(format_dict))
+        show_table(df_t3.style.format(format_dict))
 
 # ---------------------------------------------------------------------------
 # Tab 4 : Valeur du Stock
@@ -663,7 +669,7 @@ with tab4:
 
         num_cols = [c for c in df_show.columns if c in ["Qté Stock", "Valeur Stock", "Coût moyen achat"]]
         format_dict = {col: fmt_space for col in num_cols}
-        st.dataframe(df_show.style.format(format_dict), use_container_width=True)
+        show_table(df_show.style.format(format_dict), use_container_width=True)
 
         pdf_subtitle = "Filtre par dépôt, filtre par famille, filtre par articles"
 
@@ -786,7 +792,7 @@ with tab5:
                 st.info("Aucune donnée.")
             else:
                 fmt = {c: "{:,.2f}" for c in (numeric_cols or []) if c in df.columns}
-                st.dataframe(df.style.format(fmt) if fmt else df, use_container_width=True)
+                show_table(df.style.format(fmt) if fmt else df, use_container_width=True)
 
         _show_section("1. Bons de Commande en Cours",     "bc_en_cours",
                        ["Montant HT", "Montant TTC"])
@@ -811,7 +817,7 @@ with tab5:
         df_ca = _dfs_export["comparaison_ca"]
         if not df_ca.empty:
             num_cols_ca = [c for c in df_ca.columns if c != "Période"]
-            st.dataframe(df_ca.style.format({c: "{:,.2f}" for c in num_cols_ca}),
+            show_table(df_ca.style.format({c: "{:,.2f}" for c in num_cols_ca}),
                          use_container_width=True)
         else:
             st.info("Aucune donnée de comparaison CA.")
@@ -887,12 +893,16 @@ with tab6:
         )
         st.markdown("---")
 
-        if "Valeur Stock" in df_dormant.columns:
-            df_dormant_display = df_dormant.copy()
-            df_dormant_display["Valeur Stock"] = pd.to_numeric(df_dormant_display["Valeur Stock"], errors="coerce").fillna(0.0)
-            st.dataframe(df_dormant_display.style.format({"Valeur Stock": "{:,.2f}"}), use_container_width=True)
+        # Le PDF garde JJ/MM/AAAA ; seul l'affichage écran passe en AAAA-MM-JJ
+        df_dormant_display = df_dormant.copy()
+        if "Dernière Vente" in df_dormant_display.columns:
+            df_dormant_display["Dernière Vente"] = pd.to_datetime(
+                df_dormant_display["Dernière Vente"], format="%d/%m/%Y", errors="coerce"
+            ).dt.strftime("%Y-%m-%d").fillna("-")
+        if "Valeur Stock" in df_dormant_display.columns:
+            show_table(df_dormant_display.style.format({"Valeur Stock": "{:,.2f}"}), use_container_width=True)
         else:
-            st.dataframe(df_dormant, use_container_width=True)
+            show_table(df_dormant_display, use_container_width=True)
 
 # ---------------------------------------------------------------------------
 # Tab 7 : Lots en Péremption
@@ -945,7 +955,7 @@ with tab7:
             pdf_subtitle=f"Expiration dans les {e_days} prochains jours",
         )
         st.markdown("---")
-        st.dataframe(df_perempt, use_container_width=True)
+        show_table(df_perempt, use_container_width=True)
 
 # ---------------------------------------------------------------------------
 # Tab 8 : Consommation par Produit
@@ -979,7 +989,7 @@ with tab8:
         if df_famille.empty:
             st.info("Aucune donnée de consommation par famille.")
         else:
-            st.dataframe(
+            show_table(
                 df_famille.style.format({"Qté Totale Consommée": "{:,.2f}"}),
                 use_container_width=True,
             )
@@ -996,7 +1006,7 @@ with tab8:
             available_cols = [c for c in fixed_debut + mois_cols if c in df_article.columns]
             df_article = df_article[available_cols]
 
-            st.dataframe(
+            show_table(
                 df_article.style.format({c: "{:,.2f}" for c in mois_cols}),
                 use_container_width=True,
             )
@@ -1047,7 +1057,7 @@ with tab9:
         sums = df_t9[[c for c in numeric_cols if c in df_t9.columns]].sum()
         df_sums = pd.DataFrame([sums])
         df_sums.insert(0, "Nom Client", len(df_t9))
-        st.dataframe(df_sums.style.format(format_dict))
+        show_table(df_sums.style.format(format_dict))
 
         st.markdown("**Détail de la balance âgée :**")
-        st.dataframe(df_t9.style.format(format_dict))
+        show_table(df_t9.style.format(format_dict))

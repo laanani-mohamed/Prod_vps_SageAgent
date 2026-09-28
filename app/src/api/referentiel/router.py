@@ -31,7 +31,7 @@ from api.referentiel.schemas import (
     ReferentielResponse,
     ComptesTiersRequest, CollaborateurRequest, ArticleDetailRequest,
     FamilleRequest, LotSerieRequest, DocEnteteRequest,
-    DocLigneRequest, StockDepotRequest, ReglementRequest,
+    DocLigneRequest, StockDepotRequest, ReglementRequest, DateRangeRequest,
 )
 from api.referentiel.service import get_specific
 
@@ -314,6 +314,32 @@ def get_reglements(
     return secured_handle(
         get_specific,
         endpoint="/api/referentiel/reglements",
+        request=r,
+        current_user=current_user,
+        client_schema=req.client_schema,
+        req=req,
+    )
+
+
+@router.post(
+    "/date-range",
+    response_model=ReferentielResponse,
+    summary="Bornes min/max de do_date (filtres de date du dashboard)",
+    description="""
+Retourne une seule ligne `{date_min, date_max}` (YYYY-MM-DD) calculée sur `do_date` :
+- `table='docentete'` : F_DOCENTETE (filtres `do_domaine`, `do_type`)
+- `table='docligne'`  : F_DOCLIGNE (filtres `do_domaine`, `do_type`, `ar_ref`)
+- `table='reglement'` : F_REGLECH, date de l'entête du document réglé
+    """,
+)
+def get_date_range(
+    req: DateRangeRequest,
+    r: Request,
+    current_user: TokenData = Depends(require_role("analyst"))
+) -> ReferentielResponse:
+    return secured_handle(
+        get_specific,
+        endpoint="/api/referentiel/date-range",
         request=r,
         current_user=current_user,
         client_schema=req.client_schema,

@@ -7,6 +7,7 @@ import streamlit as st
 import pandas as pd
 from components.styles_fichier_base import apply_fichier_base_css
 from components.data_tables import show_df
+from components.date_filters import date_range_filter
 from components.charts import render_product_evolution_chart
 from components.auth_guard import require_auth, handle_auth_error, require_api_health
 
@@ -18,6 +19,7 @@ from services.referentiel_service import (
     get_familles, get_lots_series, get_collaborateurs
 )
 from services.article_service import get_article_top_clients, get_article_stock_depots, get_article_stats
+from services.documents_service import get_date_bounds
 from services.tiers_service import search_comptes_tiers
 from services.depot_service import get_depots_summary
 
@@ -166,91 +168,85 @@ with tab1:
             _stock   = float(_art_row.get("qte_stock_totale") or 0.0)
 
             st.markdown("**Période d'analyse**")
-            col_d1, col_d2 = st.columns(2)
-            with col_d1:
-                import datetime
-                date_from_stat = st.date_input(
-                    "Date début",
-                    value=datetime.date.today().replace(month=1, day=1),
-                    key="stat_date_from"
-                )
-            with col_d2:
-                date_to_stat = st.date_input(
-                    "Date fin",
-                    value=datetime.date.today(),
-                    key="stat_date_to"
-                )
+            import datetime
+            # Bornes : lignes de vente de l'article (documents sur lesquels portent les stats)
+            art_min, art_max = get_date_bounds(client_schema, "docligne", [0], ar_ref=[selected_ar_ref])
+            date_from_stat, date_to_stat, dates_ok_stat = date_range_filter(
+                "stat_date_from", "stat_date_to", art_min, art_max,
+                default_from=datetime.date.today().replace(month=1, day=1), default_to=datetime.date.today(),
+            )
 
             st.divider()
 
-            with st.spinner(f"Calcul des statistiques pour {selected_ar_ref}..."):
-                stats = get_article_stats(
-                    client_schema=client_schema,
-                    ar_ref=selected_ar_ref,
-                    ar_prixach=_prixach,
-                    ar_prixven=_prixven,
-                    qte_stock_actuel=_stock,
-                    date_from=str(date_from_stat),
-                    date_to=str(date_to_stat),
-                )
-
-            st.markdown("##### Indicateurs de base")
-            k1, k2, k3, k4 = st.columns(4)
-            with k1:
-                with st.container(border=True, key="kpi1"):
-                    st.metric(
-                        "Stock actuel",
-                        f"{_stock:,.1f}",
-                        help="Quantité en stock au moment de la consultation"
-                    )
-            with k2:
-                with st.container(border=True, key="kpi2"):
-                    st.metric(
-                        "Quantité vendue",
-                        f"{stats['quantite_vendue']:,.1f}",
-                        help=f"Sur la période {date_from_stat} → {date_to_stat}"
-                    )
-            with k3:
-                with st.container(border=True, key="kpi3"):
-                    st.metric(
-                        "CA HT",
-                        f"{stats['chiffre_affaires_ht']:,.2f} DH",
-                        help="Chiffre d'affaires hors taxes sur la période"
-                    )
-            with k4:
-                with st.container(border=True, key="kpi4"):
-                    st.metric(
-                        "Coût d'achat total",
-                        f"{stats['cout_achat_total']:,.2f} DH",
-                        help=f"Qté vendue × Prix achat catalogue ({_prixach:,.2f} DH)"
+            if dates_ok_stat:
+                with st.spinner(f"Calcul des statistiques pour {selected_ar_ref}..."):
+                    stats = get_article_stats(
+                        client_schema=client_schema,
+                        ar_ref=selected_ar_ref,
+                        ar_prixach=_prixach,
+                        ar_prixven=_prixven,
+                        qte_stock_actuel=_stock,
+                        date_from=str(date_from_stat),
+                        date_to=str(date_to_stat),
                     )
 
-            st.markdown("")
+                st.markdown("##### Indicateurs de base")
+                k1, k2, k3, k4 = st.columns(4)
+                with k1:
+                    with st.container(border=True, key="kpi1"):
+                        st.metric(
+                            "Stock actuel",
+                            f"{_stock:,.1f}",
+                            help="Quantité en stock au moment de la consultation"
+                        )
+                with k2:
+                    with st.container(border=True, key="kpi2"):
+                        st.metric(
+                            "Quantité vendue",
+                            f"{stats['quantite_vendue']:,.1f}",
+                            help=f"Sur la période {date_from_stat} → {date_to_stat}"
+                        )
+                with k3:
+                    with st.container(border=True, key="kpi3"):
+                        st.metric(
+                            "CA HT",
+                            f"{stats['chiffre_affaires_ht']:,.2f} DH",
+                            help="Chiffre d'affaires hors taxes sur la période"
+                        )
+                with k4:
+                    with st.container(border=True, key="kpi4"):
+                        st.metric(
+                            "Coût d'achat total",
+                            f"{stats['cout_achat_total']:,.2f} DH",
+                            help=f"Qté vendue × Prix achat catalogue ({_prixach:,.2f} DH)"
+                        )
 
-            st.markdown("##### Métriques analytiques")
-            k5, k6, k7, k8 = st.columns(4)
+                st.markdown("")
 
-            with k5:
-                with st.container(border=True, key="kc1"):
-                    st.metric(
-                        "Marge brute",
-                        f"{stats['marge_brute']:,.2f} DH",
-                        help="CA HT − Coût d'achat total"
-                    )
-            with k6:
-                with st.container(border=True, key="kc2"):
-                    st.metric(
-                        "Taux de marge",
-                        f"{stats['marge_brute_pct']:.1f} %",
-                        help="Marge brute / CA HT × 100"
-                    )
-            with k7:
-                with st.container(border=True, key="kc3"):
-                    st.metric(
-                        "Rentabilité globale",
-                        f"{stats['rentabilite_globale']:.1f} %",
-                        help="Marge brute / Coût d'achat × 100"
-                    )
+                st.markdown("##### Métriques analytiques")
+                k5, k6, k7, k8 = st.columns(4)
+
+                with k5:
+                    with st.container(border=True, key="kc1"):
+                        st.metric(
+                            "Marge brute",
+                            f"{stats['marge_brute']:,.2f} DH",
+                            help="CA HT − Coût d'achat total"
+                        )
+                with k6:
+                    with st.container(border=True, key="kc2"):
+                        st.metric(
+                            "Taux de marge",
+                            f"{stats['marge_brute_pct']:.1f} %",
+                            help="Marge brute / CA HT × 100"
+                        )
+                with k7:
+                    with st.container(border=True, key="kc3"):
+                        st.metric(
+                            "Rentabilité globale",
+                            f"{stats['rentabilite_globale']:.1f} %",
+                            help="Marge brute / Coût d'achat × 100"
+                        )
 
 
             st.divider()

@@ -89,7 +89,7 @@ class ObjectifsResponse(BaseModel):
 class RapportCARequest(BaseBIRequest):
     date_from: Optional[str] = None
     date_to: Optional[str] = None
-    group_by: str = Field("mois", description="'mois' | 'client' | 'famille' | 'commercial' | 'region'")
+    group_by: str = Field("mois", description="'mois' | 'client' | 'commercial' | 'region'")
     limit: int = Field(100000000, ge=1)
 
 

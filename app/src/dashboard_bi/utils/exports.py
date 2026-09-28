@@ -31,21 +31,34 @@ def _format_numeric_cols(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def _write_sheet(writer, df: pd.DataFrame, sheet_name: str) -> None:
+    """Écrit une feuille en gardant de vrais nombres, format '#,##0.00' : Excel affiche
+    les séparateurs des réglages régionaux du poste (Excel FR → '2 919 412,09')."""
+    df_export = _format_numeric_cols(df)
+    df_export.to_excel(writer, index=False, sheet_name=sheet_name)
+    ws = writer.sheets[sheet_name]
+    for col_idx, col_name in enumerate(df_export.columns, start=1):
+        if pd.api.types.is_float_dtype(df_export[col_name]) or pd.api.types.is_integer_dtype(df_export[col_name]):
+            for row_idx in range(2, len(df_export) + 2):
+                ws.cell(row=row_idx, column=col_idx).number_format = '#,##0.00'
+
+
 def export_df_to_excel(df: pd.DataFrame) -> bytes:
     """Export a DataFrame to Excel with numeric columns formatted to 2 decimal places."""
-    df_export = _format_numeric_cols(df)
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df_export.to_excel(writer, index=False, sheet_name='Report')
-        # Apply number format to numeric columns
-        ws = writer.sheets['Report']
-        for col_idx, col_name in enumerate(df_export.columns, start=1):
-            if pd.api.types.is_float_dtype(df_export[col_name]) or pd.api.types.is_integer_dtype(df_export[col_name]):
-                for row_idx in range(2, len(df_export) + 2):
-                    cell = ws.cell(row=row_idx, column=col_idx)
-                    cell.number_format = '#,##0.00'
-    processed_data = output.getvalue()
-    return processed_data
+        _write_sheet(writer, df, 'Report')
+    return output.getvalue()
+
+
+def export_sections_to_excel(sections: list) -> bytes:
+    """Excel multi-feuilles : une feuille par (libellé, DataFrame) non vide."""
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        for label, df in sections:
+            if df is not None and not df.empty:
+                _write_sheet(writer, df, label[:31])
+    return output.getvalue()
 
 
 def _safe_pdf_text(value) -> str:
@@ -57,13 +70,18 @@ def _safe_pdf_text(value) -> str:
 _PLAIN_INT_COLS = frozenset({"Nb Factures", "Code", "Code Collab."})
 
 
+def format_nombre_fr(value: float) -> str:
+    """1234567.891 → '1 234 567,89' (espace pour les milliers, virgule décimale)."""
+    return f"{value:,.2f}".replace(",", " ").replace(".", ",")
+
+
 def _format_cell(item, col_name: str = None, plain_int_cols: frozenset = frozenset()) -> str:
-    """Formate une valeur de cellule PDF : floats et ints en `,.2f`, sauf les
-    colonnes de `plain_int_cols` où un int reste affiché tel quel."""
+    """Formate une valeur de cellule PDF : floats et ints au format FR à 2 décimales, sauf
+    les colonnes de `plain_int_cols` où un int reste affiché tel quel."""
     if isinstance(item, float):
-        return f"{item:,.2f}"
+        return format_nombre_fr(item)
     if isinstance(item, int) and col_name not in plain_int_cols:
-        return f"{item:,.2f}"
+        return format_nombre_fr(item)
     return str(item)
 
 

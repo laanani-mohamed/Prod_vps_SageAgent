@@ -61,6 +61,20 @@ def apply_date_filters(df: pl.DataFrame, date_from: Optional[str], date_to: Opti
     return df
 
 
+def add_ratios_ca(result: pl.DataFrame) -> pl.DataFrame:
+    """Ajoute moyenne_facture (CA HT / nb factures) et pct_ca (part du CA HT total, en %)."""
+    total = result["ca_ht"].sum() if not result.is_empty() else 0.0
+    pct = (pl.col("ca_ht") / total * 100) if total else pl.lit(0.0)
+    return result.with_columns(
+        pl.when(pl.col("nb_factures") > 0)
+          .then(pl.col("ca_ht") / pl.col("nb_factures"))
+          .otherwise(0.0)
+          .round(2)
+          .alias("moyenne_facture"),
+        pct.round(2).alias("pct_ca"),
+    )
+
+
 def group_ca_par_mois(df: pl.DataFrame) -> List[Dict[str, Any]]:
     """Groupe le CA HT par mois (YYYY-MM) trié chronologiquement."""
     result = df.with_columns(
@@ -69,7 +83,7 @@ def group_ca_par_mois(df: pl.DataFrame) -> List[Dict[str, Any]]:
         pl.col("do_totalht_f").sum().alias("ca_ht"),
         pl.col("do_piece").count().alias("nb_factures"),
     ).sort("mois")
-    return result.to_dicts()
+    return add_ratios_ca(result).to_dicts()
 
 
 def group_ca_par_client(df: pl.DataFrame) -> List[Dict[str, Any]]:
@@ -80,7 +94,7 @@ def group_ca_par_client(df: pl.DataFrame) -> List[Dict[str, Any]]:
         pl.col("do_totalht_f").sum().alias("ca_ht"),
         pl.col("do_piece").count().alias("nb_factures"),
     ).sort("ca_ht", descending=True)
-    return result.to_dicts()
+    return add_ratios_ca(result).to_dicts()
 
 
 def group_ca_par_commercial(df: pl.DataFrame) -> List[Dict[str, Any]]:
@@ -92,32 +106,37 @@ def group_ca_par_commercial(df: pl.DataFrame) -> List[Dict[str, Any]]:
         pl.col("do_totalht_f").sum().alias("ca_ht"),
         pl.col("do_piece").count().alias("nb_factures"),
     ).sort("ca_ht", descending=True)
-    return result.to_dicts()
+    return add_ratios_ca(result).to_dicts()
 
 
 def group_ca_par_region(df: pl.DataFrame) -> List[Dict[str, Any]]:
-    """Groupe le CA HT par region (ct_ville), trié desc."""
-    if "ct_ville" not in df.columns:
+    """Groupe le CA HT par région du client (F_COMPTET.ct_coderegion), trié desc."""
+    if "ct_coderegion" not in df.columns:
         return []
-    result = df.group_by("ct_ville").agg(
+    result = df.group_by("ct_coderegion").agg(
         pl.col("do_totalht_f").sum().alias("ca_ht"),
         pl.col("do_piece").count().alias("nb_factures"),
     ).sort("ca_ht", descending=True)
-    return result.to_dicts()
+    return add_ratios_ca(result).to_dicts()
 
 
 def join_tiers(df: pl.DataFrame, df_tiers: Optional[pl.DataFrame]) -> pl.DataFrame:
-    """Enrichit le DataFrame avec ct_intitule et ct_ville depuis F_COMPTET."""
+    """Enrichit le DataFrame avec ct_intitule et ct_coderegion depuis F_COMPTET."""
     if df_tiers is not None:
-        # Some archives might not have ct_ville, we need to handle that gracefully
         cols_to_select = ["ct_num", "ct_intitule"]
-        if "ct_ville" in df_tiers.columns:
-            cols_to_select.append("ct_ville")
-            
+        if "ct_coderegion" in df_tiers.columns:
+            cols_to_select.append("ct_coderegion")
+
         df = df.join(
             df_tiers.select(cols_to_select),
             left_on="do_tiers", right_on="ct_num", how="left"
         )
+        if "ct_coderegion" in df.columns:
+            region = pl.col("ct_coderegion").cast(pl.Utf8).str.strip_chars().str.to_uppercase()
+            df = df.with_columns(
+                pl.when(region.is_null() | (region == "")).then(pl.lit("NON RENSEIGNÉE"))
+                  .otherwise(region).alias("ct_coderegion")
+            )
     return df
 
 

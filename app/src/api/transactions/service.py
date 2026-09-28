@@ -94,7 +94,8 @@ def _from_archive(req: TransactionsRequest, endpoint: str) -> TransactionsRespon
     # Base DataFrame
     df = df_entete
     if df_ligne is not None:
-        df = df.join(df_ligne, on=["do_piece", "do_domaine"], how="inner")
+        # Clé unique de l'entête ; co_no reste celui de l'entête (celui de la ligne devient co_no_right)
+        df = df.join(df_ligne, on=["do_piece", "do_domaine", "do_type"], how="inner")
 
     # Filtres
     f = req.filters
