@@ -848,7 +848,8 @@ with tab5:
         st.markdown(f"#### 7. Comparaison CA ({_titre_cmp}) — 6 mois glissants")
         if not df_ca.empty:
             num_cols_ca = [c for c in df_ca.columns if c != "Période"]
-            show_table(df_ca.style.format({c: "{:,.2f}" for c in num_cols_ca}),
+            # Évolution vide sur la ligne de l'année précédente (na_rep)
+            show_table(df_ca.style.format({c: "{:,.2f}" for c in num_cols_ca}, na_rep=""),
                          use_container_width=True)
         else:
             st.info("Aucune donnée de comparaison CA.")

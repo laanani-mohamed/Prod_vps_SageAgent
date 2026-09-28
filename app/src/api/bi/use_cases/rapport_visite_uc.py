@@ -262,5 +262,13 @@ def _comparaison_ca(repo, req, date_from: str, date_to: str,
 
     row_n   = {"Période": _libelle_periode(today.year)};     row_n.update(ca_n)
     row_n1  = {"Période": _libelle_periode(today.year - 1)}; row_n1.update(ca_n1)
+
+    # Total de la ligne (6 mois + En Cours) et évolution de l'année en cours vs précédente :
+    # (Total N − Total N-1) ÷ |Total N-1| × 100 — vide si Total N-1 = 0 (non calculable)
+    # et toujours vide sur la ligne de l'année précédente.
+    total_n, total_n1 = round(sum(ca_n.values()), 2), round(sum(ca_n1.values()), 2)
+    row_n["Total"], row_n1["Total"] = total_n, total_n1
+    row_n["Évolution (%)"] = round((total_n - total_n1) / abs(total_n1) * 100, 2) if total_n1 else None
+    row_n1["Évolution (%)"] = None
     return [row_n, row_n1]
 

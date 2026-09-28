@@ -77,7 +77,9 @@ def format_nombre_fr(value: float) -> str:
 
 def _format_cell(item, col_name: str = None, plain_int_cols: frozenset = frozenset()) -> str:
     """Formate une valeur de cellule PDF : floats et ints au format FR à 2 décimales, sauf
-    les colonnes de `plain_int_cols` où un int reste affiché tel quel."""
+    les colonnes de `plain_int_cols` où un int reste affiché tel quel. Valeur absente → cellule vide."""
+    if item is None or (isinstance(item, float) and pd.isna(item)):
+        return ""
     if isinstance(item, float):
         return format_nombre_fr(item)
     if isinstance(item, int) and col_name not in plain_int_cols:
