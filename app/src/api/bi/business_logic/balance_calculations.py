@@ -14,6 +14,12 @@ _MOIS_FR = [
 ]
 
 
+def _decale_mois(annee: int, mois: int, decalage: int) -> tuple[int, int]:
+    """(annee, mois) du mois situé `decalage` mois avant (annee, mois)."""
+    total = annee * 12 + (mois - 1) - decalage
+    return total // 12, total % 12 + 1
+
+
 def _label_mois_annee(annee: int, mois: int, decalage: int) -> str:
     """Libellé 'Mois Année' du mois situé `decalage` mois avant (annee, mois)."""
     m = mois - decalage

@@ -21,17 +21,11 @@ import polars as pl
 
 from api.bi.schemas import RapportVisiteClientRequest, RapportResponse
 from api.bi.repositories.pg_repo.bi_visite_client_repo import PgBIVisiteClientRepository
-from api.bi.business_logic.balance_calculations import _MOIS_FR, _label_mois_annee
+from api.bi.business_logic.balance_calculations import _MOIS_FR, _decale_mois, _label_mois_annee
 
 logger = logging.getLogger("api.bi.use_cases.rapport_visite")
 
 NB_MOIS = 6
-
-
-def _decale_mois(annee: int, mois: int, decalage: int) -> tuple[int, int]:
-    """(annee, mois) du mois situé `decalage` mois avant (annee, mois)."""
-    total = annee * 12 + (mois - 1) - decalage
-    return total // 12, total % 12 + 1
 
 
 def _un_an_avant(d: date) -> date:
