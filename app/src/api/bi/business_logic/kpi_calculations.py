@@ -26,6 +26,12 @@ from api.bi.repositories.archive_repo.base_bi_archive import safe_float_col
 logger = logging.getLogger("api.bi.business_logic.kpi")
 
 
+def _jour() -> pl.Expr:
+    """Date du document au format 'YYYY-MM-DD'. do_date est un timestamp : comparé tel quel
+    ('2026-09-23 00:00:00' > '2026-09-23'), le dernier jour de la période serait exclu."""
+    return pl.col("do_date").cast(pl.Utf8).str.slice(0, 10)
+
+
 def prepare_docentete(df_raw: pl.DataFrame) -> pl.DataFrame:
     """
     Prépare le DataFrame F_DOCENTETE avec les colonnes castées nécessaires.
@@ -44,9 +50,9 @@ def calc_chiffre_affaires(df_e: pl.DataFrame, date_from: Optional[str], date_to:
     """Calcule le CA HT sur les factures vente (do_type=6, do_domaine=0) avec filtre période."""
     df = df_e
     if date_from:
-        df = df.filter(pl.col("do_date").cast(pl.Utf8) >= date_from)
+        df = df.filter(_jour() >= date_from)
     if date_to:
-        df = df.filter(pl.col("do_date").cast(pl.Utf8) <= date_to)
+        df = df.filter(_jour() <= date_to)
     df_ca = df.filter((pl.col("do_domaine") == 0) & pl.col("do_type").is_in([6, 7]))
     return float(df_ca["do_totalht_f"].sum() or 0)
 
@@ -70,8 +76,8 @@ def calc_ca_n_minus_1(df_e_unfiltered: pl.DataFrame, date_from: str, date_to: st
         df_ca_n1 = df_e_unfiltered.filter(
             (pl.col("do_domaine") == 0) &
             pl.col("do_type").is_in([6, 7]) &
-            (pl.col("do_date").cast(pl.Utf8) >= d_from_n1) &
-            (pl.col("do_date").cast(pl.Utf8) <= d_to_n1)
+            (_jour() >= d_from_n1) &
+            (_jour() <= d_to_n1)
         )
         return float(df_ca_n1["do_totalht_f"].sum() or 0)
     except Exception as e:
@@ -84,9 +90,9 @@ def calc_evolution_mensuelle(df_e: pl.DataFrame, date_from: Optional[str], date_
     try:
         df = df_e
         if date_from:
-            df = df.filter(pl.col("do_date").cast(pl.Utf8) >= date_from)
+            df = df.filter(_jour() >= date_from)
         if date_to:
-            df = df.filter(pl.col("do_date").cast(pl.Utf8) <= date_to)
+            df = df.filter(_jour() <= date_to)
         df_ca = df.filter((pl.col("do_domaine") == 0) & pl.col("do_type").is_in([6, 7]))
 
         df_monthly = df_ca.with_columns(
@@ -130,9 +136,9 @@ def calc_total_achats(df_e: pl.DataFrame, date_from: Optional[str], date_to: Opt
     """Calcule le total des achats HT (do_type=16, 17) avec filtre période."""
     df = df_e
     if date_from:
-        df = df.filter(pl.col("do_date").cast(pl.Utf8) >= date_from)
+        df = df.filter(_jour() >= date_from)
     if date_to:
-        df = df.filter(pl.col("do_date").cast(pl.Utf8) <= date_to)
+        df = df.filter(_jour() <= date_to)
     df_ach = df.filter(pl.col("do_type").is_in([16, 17]))
     return float(df_ach["do_totalht_f"].sum() or 0)
 
@@ -141,9 +147,9 @@ def calc_nb_clients_actifs(df_e: pl.DataFrame, date_from: Optional[str], date_to
     """Nombre de clients distincts sur les factures vente de la période."""
     df = df_e
     if date_from:
-        df = df.filter(pl.col("do_date").cast(pl.Utf8) >= date_from)
+        df = df.filter(_jour() >= date_from)
     if date_to:
-        df = df.filter(pl.col("do_date").cast(pl.Utf8) <= date_to)
+        df = df.filter(_jour() <= date_to)
     df_ca = df.filter((pl.col("do_domaine") == 0) & pl.col("do_type").is_in([6, 7]))
     return df_ca["do_tiers"].n_unique()
 

@@ -38,7 +38,7 @@ def prepare_docentete_analytique(df_raw: pl.DataFrame) -> pl.DataFrame:
         safe_float_col(df_raw, "do_totalht").alias("do_totalht_f"),
         safe_float_col(df_raw, "do_totalttc").alias("do_totalttc_f"),
         safe_float_col(df_raw, "do_montantregle").alias("do_montantregle_f"),
-        pl.col("do_date").cast(pl.Utf8).alias("do_date_str"),
+        pl.col("do_date").cast(pl.Utf8).str.slice(0, 10).alias("do_date_str"),
     ])
 
 
@@ -50,7 +50,7 @@ def prepare_docligne_analytique(df_raw: pl.DataFrame) -> pl.DataFrame:
         safe_float_col(df_raw, "dl_montantht").alias("dl_montantht_f"),
         safe_float_col(df_raw, "dl_qtebl").alias("dl_qtebl_f"),
         safe_float_col(df_raw, "dl_prixru").alias("dl_prixru_f"),
-        pl.col("do_date").cast(pl.Utf8).alias("do_date_str"),
+        pl.col("do_date").cast(pl.Utf8).str.slice(0, 10).alias("do_date_str"),
     ]
     # Si ar_prixach est déjà présent (repo PG joint F_ARTICLE), on crée ar_prixach_f
     if "ar_prixach" in df_raw.columns:
@@ -113,13 +113,13 @@ def calc_dso(df_fac_ytd: pl.DataFrame, df_enc_all: pl.DataFrame, nb_jours: int) 
     return ca_ttc, encours_ttc, dso
 
 
-def calc_taux_impayes(df_e_all_fac: pl.DataFrame) -> tuple[int, int, float]:
+def calc_taux_impayes(df_fac: pl.DataFrame) -> tuple[int, int, float]:
     """
-    Calcule le taux d'impayés.
+    Calcule le taux d'impayés : factures dont le reste (TTC − réglé) > 1 MAD / factures × 100.
     Retourne (nb_factures_total, nb_factures_impayees, taux_impayes_pct).
     """
-    nb_total = len(df_e_all_fac)
-    df_impayees = df_e_all_fac.with_columns(
+    nb_total = len(df_fac)
+    df_impayees = df_fac.with_columns(
         (pl.col("do_totalttc_f") - pl.col("do_montantregle_f")).alias("reste")
     ).filter(pl.col("reste") > 1.0)
     nb_impayes = len(df_impayees)

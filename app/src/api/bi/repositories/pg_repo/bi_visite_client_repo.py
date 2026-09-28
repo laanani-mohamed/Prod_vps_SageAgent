@@ -92,10 +92,11 @@ JOIN {schema}.f_docentete e ON e.do_piece = l.do_piece
 WHERE e.do_domaine = 0
   AND e.do_type IN (6, 7)
   AND e.do_tiers = %s
-  AND CAST(e.do_date AS TEXT) >= %s
+  AND LEFT(CAST(e.do_date AS TEXT), 10) >= %s
+  AND LEFT(CAST(e.do_date AS TEXT), 10) <= %s
 ORDER BY ar_ref, do_date
 """.strip()
-        return sql, [req.do_tiers, req.date_from], col_aliases
+        return sql, [req.do_tiers, req.date_from, req.date_to], col_aliases
 
     # ── 4. Familles vendues au client (tous temps) ──────────────────────────
     def fetch_familles_vendues(self, req) -> List[Dict[str, Any]]:

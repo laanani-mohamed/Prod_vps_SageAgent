@@ -92,7 +92,7 @@ def execute(client_schema: str, date_from: str, date_to: str) -> KpiAnalytiqueRe
             result.encours_ttc = encours_ttc
             result.dso_jours   = dso
 
-            # Taux impayés
+            # Taux impayés — toutes les factures de vente, tout l'historique
             df_all_fac = df_e.filter((pl.col("do_domaine") == 0) & (pl.col("do_type").is_in([6, 7])))
             nb_total, nb_impayes, taux_impayes = calc_taux_impayes(df_all_fac)
             result.nb_factures_total    = nb_total

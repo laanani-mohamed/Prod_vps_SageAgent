@@ -169,8 +169,8 @@ with tab1:
 
             st.markdown("**Période d'analyse**")
             import datetime
-            # Bornes : lignes de vente de l'article (documents sur lesquels portent les stats)
-            art_min, art_max = get_date_bounds(client_schema, "docligne", [0], ar_ref=[selected_ar_ref])
+            # Bornes : lignes facturées de l'article (documents sur lesquels portent les stats)
+            art_min, art_max = get_date_bounds(client_schema, "docligne", [0], [6, 7], ar_ref=[selected_ar_ref])
             date_from_stat, date_to_stat, dates_ok_stat = date_range_filter(
                 "stat_date_from", "stat_date_to", art_min, art_max,
                 default_from=datetime.date.today().replace(month=1, day=1), default_to=datetime.date.today(),
@@ -197,28 +197,28 @@ with tab1:
                         st.metric(
                             "Stock actuel",
                             f"{_stock:,.1f}",
-                            help="Quantité en stock au moment de la consultation"
+                            help="Quantité en stock, tous dépôts confondus, au moment de la consultation."
                         )
                 with k2:
                     with st.container(border=True, key="kpi2"):
                         st.metric(
                             "Quantité vendue",
                             f"{stats['quantite_vendue']:,.1f}",
-                            help=f"Sur la période {date_from_stat} → {date_to_stat}"
+                            help=f"**Formule** : Σ quantités des lignes de factures de vente de l'article (avoirs déduits)  \n**Période** : {date_from_stat} → {date_to_stat}"
                         )
                 with k3:
                     with st.container(border=True, key="kpi3"):
                         st.metric(
                             "CA HT",
                             f"{stats['chiffre_affaires_ht']:,.2f} DH",
-                            help="Chiffre d'affaires hors taxes sur la période"
+                            help=f"**Formule** : Σ montants HT des lignes de factures de vente de l'article (avoirs déduits)  \n**Période** : {date_from_stat} → {date_to_stat}"
                         )
                 with k4:
                     with st.container(border=True, key="kpi4"):
                         st.metric(
                             "Coût d'achat total",
                             f"{stats['cout_achat_total']:,.2f} DH",
-                            help=f"Qté vendue × Prix achat catalogue ({_prixach:,.2f} DH)"
+                            help=f"**Formule** : Quantité vendue × Prix d'achat de la fiche article ({_prixach:,.2f} DH)"
                         )
 
                 st.markdown("")
@@ -231,21 +231,21 @@ with tab1:
                         st.metric(
                             "Marge brute",
                             f"{stats['marge_brute']:,.2f} DH",
-                            help="CA HT − Coût d'achat total"
+                            help="**Formule** : CA HT − Coût d'achat total"
                         )
                 with k6:
                     with st.container(border=True, key="kc2"):
                         st.metric(
                             "Taux de marge",
                             f"{stats['marge_brute_pct']:.1f} %",
-                            help="Marge brute / CA HT × 100"
+                            help="**Formule** : Marge brute ÷ CA HT × 100"
                         )
                 with k7:
                     with st.container(border=True, key="kc3"):
                         st.metric(
                             "Rentabilité globale",
                             f"{stats['rentabilite_globale']:.1f} %",
-                            help="Marge brute / Coût d'achat × 100"
+                            help="**Formule** : Marge brute ÷ Coût d'achat total × 100"
                         )
 
 

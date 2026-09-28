@@ -799,7 +799,7 @@ with tab5:
             "articles_par_mois":    "3-Articles par mois",
             "familles_actives":     "4-Familles actives",
             "familles_dormantes":   "5-Familles dormantes",
-            "familles_mortes":      "6-Familles mortes",
+            "familles_mortes":      "6-Familles jamais vendues",
             "comparaison_ca":       "7-Comparaison CA",
         }
         sections = [(label, _dfs_export.get(key, pd.DataFrame())) for key, label in section_labels.items()]
@@ -827,8 +827,10 @@ with tab5:
         _show_section("2. Factures Non Réglées",          "factures_non_reglees",
                        ["Montant HT", "Montant TTC", "Reste à Payer"])
         st.markdown("---")
+        # Colonnes mois « Mois Année » + En Cours + Total : tout sauf les identifiants
+        _df_art = _dfs_export["articles_par_mois"]
         _show_section("3. Articles Vendus par Mois (6M)", "articles_par_mois",
-                       ["M6", "M5", "M4", "M3", "M2", "M1", "En Cours"])
+                       [c for c in _df_art.columns if c not in ("Référence", "Désignation")])
         st.markdown("---")
         _show_section("4. Familles Actives (6 derniers mois)", "familles_actives",
                        ["CA HT"])
@@ -836,12 +838,14 @@ with tab5:
         _show_section("5. Familles Dormantes (vente > 6 mois)", "familles_dormantes",
                        ["CA HT"])
         st.markdown("---")
-        _show_section("6. Familles Mortes (jamais vendues)",     "familles_mortes")
+        _show_section("6. Familles jamais vendues",     "familles_mortes")
         st.markdown("---")
 
-        # Section 7 — Comparaison CA
-        st.markdown("#### 7. Comparaison CA (N vs N-1) — 6 mois glissants")
+        # Section 7 — Comparaison CA : lignes libellées par année (« 2026 » vs « 2025 »)
         df_ca = _dfs_export["comparaison_ca"]
+        _annees = df_ca["Période"].astype(str).tolist() if "Période" in df_ca.columns else []
+        _titre_cmp = f"{_annees[0]} vs {_annees[1]}" if len(_annees) == 2 else "année en cours vs année précédente"
+        st.markdown(f"#### 7. Comparaison CA ({_titre_cmp}) — 6 mois glissants")
         if not df_ca.empty:
             num_cols_ca = [c for c in df_ca.columns if c != "Période"]
             show_table(df_ca.style.format({c: "{:,.2f}" for c in num_cols_ca}),

@@ -157,6 +157,7 @@ def get_article_stats(
         "ar_ref": [ar_ref],
         "with_entete": True,
         "do_domaine": [0],   # domaine Ventes uniquement
+        "do_type": [6, 7],   # factures uniquement (même base que le CA) : pas de devis/BC/BL/retours
     }
     if date_from:
         filters["date_from"] = date_from

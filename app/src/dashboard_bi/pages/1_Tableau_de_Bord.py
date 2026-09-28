@@ -15,7 +15,7 @@ from components.auth_guard import require_auth, handle_auth_error
 apply_custom_css()
 require_auth()
 
-from services.bi_service import get_dashboard_objectifs, get_dashboard_analytique, get_dashboard_kpis
+from services.bi_service import get_dashboard_analytique, get_dashboard_kpis
 from services.top_client_service import get_top_clients_from_docentete
 from services.base import check_api_health
 
@@ -58,8 +58,19 @@ except Exception:
 
 ytd_from = latest_date.replace(month=1, day=1).isoformat()
 ytd_to   = latest_date.isoformat()
-ytd_label = f"Cumul annuel {latest_date.year}"
 all_time_from = "2000-01-01"
+
+# Même période un an plus tôt (29 février → 28 février), comme le calcul du CA N-1 côté API
+_ytd_to_n1 = latest_date.replace(year=latest_date.year - 1, day=28) if (latest_date.month, latest_date.day) == (2, 29) \
+    else latest_date.replace(year=latest_date.year - 1)
+ytd_from_n1 = latest_date.replace(year=latest_date.year - 1, month=1, day=1).isoformat()
+ytd_to_n1   = _ytd_to_n1.isoformat()
+periode_txt = f"**Période** : du {ytd_from} au {ytd_to}"
+
+# Seuils de pilotage (MAD)
+OBJECTIF_CA      = 25_000_000
+LIMITE_ENCOURS   = 30_000_000
+LIMITE_DETTES    = 20_000_000
 
 # ---------------------------------------------------------------------------
 # Calcul des KPIs
@@ -75,18 +86,18 @@ with st.spinner("Calcul des indicateurs principaux..."):
         valeur_stock = kpis.get("valeur_stock", 0.0)
         encours_clients = kpis.get("encours_clients", 0.0)
         dettes_fournisseurs = kpis.get("dettes_fournisseurs", 0.0)
-        ca_evo = kpis.get("ca_evolution_pct", 0.0)
+        ca_evo = kpis.get("ca_evolution_pct")  # None si CA N-1 ≤ 0
         nb_clients = kpis.get("nb_clients_actifs", 0)
-        
-        objectifs = get_dashboard_objectifs(client_schema)
-        pct_ca = next((obj.get("pct_atteinte") for obj in objectifs if obj.get("axe") == "Performance Commerciale"), None)
-        pct_encours = next((obj.get("pct_atteinte") for obj in objectifs if obj.get("axe") == "Encours Clients"), None)
     except Exception as e:
         handle_auth_error(e)
-        ca = ca_n_1 = achats = valeur_stock = encours_clients = dettes_fournisseurs = ca_evo = 0.0
+        ca = ca_n_1 = achats = valeur_stock = encours_clients = dettes_fournisseurs = 0.0
+        ca_evo = None
         nb_clients = 0
-        pct_ca = None
-        pct_encours = None
+
+# Taux d'atteinte calculés sur les montants affichés (même période, même base HT/TTC)
+pct_ca      = round(ca / OBJECTIF_CA * 100, 1)
+pct_encours = round(encours_clients / LIMITE_ENCOURS * 100, 1)
+pct_dettes  = round(dettes_fournisseurs / LIMITE_DETTES * 100, 1)
 
 st.caption(f"Période : du {ytd_from} au {ytd_to}")
 
@@ -110,13 +121,17 @@ km3, km4, km7 = st.columns(3)
 
 with km1:
     with st.container(border=True, key="kpi1"):
-        pct_ca_val = pct_ca if pct_ca is not None else 0.0
+        pct_ca_val = pct_ca
         st.metric(
             label="Chiffre d'Affaires (Obj)",
             value=to_m_str(ca),
             #delta=f"{pct_ca_val}% de l'objectif 25 MMAD",
             #delta_color="inverse",
-            help=f"CA HT des ventes cumulé depuis le début de l'année ({ytd_label}).",
+            help=(
+                "**Formule** : Σ montants HT des factures de vente (avoirs déduits)  \n"
+                f"{periode_txt}  \n"
+                "**% de l'objectif** : CA HT ÷ 25 000 000 × 100"
+            ),
         )
         st.html(
             f"""
@@ -137,7 +152,12 @@ with km2:
         st.metric(
             label=f"Chiffre d'Affaires ({year_n_1})",
             value=to_m_str(ca_n_1),
-            help=f"CA HT des ventes comparé à la même période en {year_n_1}.",
+            help=(
+                "**Formule** : Σ montants HT des factures de vente (avoirs déduits)  \n"
+                f"**Période** : du {ytd_from_n1} au {ytd_to_n1} (même période un an plus tôt)  \n"
+                f"**Évolution** : (CA {latest_date.year} − CA {year_n_1}) ÷ CA {year_n_1} × 100 "
+                f"— N/A si le CA {year_n_1} est nul ou négatif"
+            ),
         )
         st.html(
             f"""
@@ -157,7 +177,10 @@ with km3:
         st.metric(
             label="Total Achats",
             value=to_m_str(achats),
-            help=f"Achats HT cumulés depuis le début de l'année ({ytd_label}).",
+            help=(
+                "**Formule** : Σ montants HT des factures d'achat (avoirs fournisseurs déduits)  \n"
+                f"{periode_txt}"
+            ),
         )
 
 with km4:
@@ -165,7 +188,10 @@ with km4:
         st.metric(
             label="Valeur Stock",
             value=to_m_str(valeur_stock),
-            help="Valorisation du stock (Qté × Prix achat) — état actuel.",
+            help=(
+                "**Formule** : Σ (Quantité en stock × Prix d'achat de la fiche article), tous dépôts  \n"
+                "**Date** : état actuel du stock"
+            ),
         )
 
 with km5:
@@ -173,9 +199,13 @@ with km5:
         st.metric(
             label="Encours Clients",
             value=to_m_str(encours_clients),
-            help="Total des factures non réglées (TTC − réglé) — tout l'historique.",
+            help=(
+                "**Formule** : Σ (Montant TTC − Montant réglé) des factures de vente dont le reste à payer est > 0  \n"
+                "**Période** : tout l'historique  \n"
+                "**% de la limite** : Encours ÷ 30 000 000 × 100"
+            ),
         )
-        delta_text_encours = f"{pct_encours}% de la limite 30 MMAD" if pct_encours is not None else "N/A"
+        delta_text_encours = f"{pct_encours}% de la limite 30 MMAD"
         st.html(
             f"""
             <div style="
@@ -191,11 +221,14 @@ with km5:
 
 with km6:
     with st.container(border=True, key="kpi6"):
-        pct_dettes = round((dettes_fournisseurs / 20000000) * 100, 1) if dettes_fournisseurs else 0.0
         st.metric(
             label="Dettes Fournisseurs",
             value=to_m_str(dettes_fournisseurs),
-            help="Total des factures d'achats non réglées (all-time).",
+            help=(
+                "**Formule** : Σ (Montant TTC − Montant réglé) des factures d'achat dont le reste à payer est > 0  \n"
+                "**Période** : tout l'historique  \n"
+                "**% de la limite** : Dettes ÷ 20 000 000 × 100"
+            ),
         )
         st.html(
             f"""
@@ -215,7 +248,10 @@ with km7:
         st.metric(
             label="Clients Actifs",
             value=f"{nb_clients}",
-            help=f"Nombre de clients distincts facturés depuis le début de l'année ({ytd_label}).",
+            help=(
+                "**Formule** : nombre de clients distincts ayant au moins une facture de vente  \n"
+                f"{periode_txt}"
+            ),
         )
 
 st.divider()
@@ -254,7 +290,13 @@ with kc1:
         st.metric(
             label="Marge Brute",
             value=to_m_str(marge_brute),
-            help="CA HT − Coût de revient (DL_MontantHT − DL_QteBL × DL_PrixRU) — YTD.",
+            help=(
+                "**Formule** : CA HT des lignes facturées − Σ (Quantité livrée × Coût unitaire)  \n"
+                "**Coût unitaire** : prix de revient de la ligne ; à défaut le CMUP ; "
+                "à défaut le prix d'achat de la fiche article  \n"
+                "**Taux de marge** : Marge brute ÷ CA HT × 100  \n"
+                f"{periode_txt}"
+            ),
         )
         st.markdown(
             f"<span style='color:{sub_info_color};font-size:0.85rem;'>"
@@ -268,7 +310,11 @@ with kc2:
         st.metric(
             label="Taux Factures Impayées",
             value=f"{taux_impayes:.1f} %",
-            help=f"Factures avec solde > 1 MAD : {nb_fac_imp} / {nb_fac_total} factures YTD.",
+            help=(
+                "**Formule** : Factures impayées ÷ Factures de vente × 100  \n"
+                "**Facture impayée** : reste à payer (TTC − réglé) > 1 MAD  \n"
+                "**Période** : tout l'historique"
+            ),
         )
         st.markdown(
             f"<span style='color:{sub_info_color};font-size:0.85rem;'>"
@@ -282,25 +328,34 @@ with kc3:
         st.metric(
             label="Taux de Retour",
             value=f"{taux_retour:.1f} %",
-            help=f"Bons de Retour / Factures — {nb_br} / {nb_fac_livre} YTD.",
+            help=(
+                "**Formule** : Bons de retour ÷ Factures de vente × 100  \n"
+                f"{periode_txt}"
+            ),
         )
         st.markdown(
             f"<span style='color:{sub_info_color};font-size:0.85rem;'>"
-            f"{nb_br} retour(s) sur {nb_fac_livre} livraison(s)"
+            f"{nb_br} bon(s) de retour sur {nb_fac_livre} factures"
             f"</span>",
             unsafe_allow_html=True,
         )
 
 with kc4:
     with st.container(border=True, key="kc4"):
+        # Sans aucun devis sur la période, le taux n'a pas de sens (l'API renvoie 0)
         st.metric(
             label="Taux Conversion Devis → Facture",
-            value=f"{taux_conv:.1f} %",
-            help=f"Factures générées vs Devis émis : {nb_fac_conv} / {nb_devis + nb_fac_conv} YTD.",
+            value=f"{taux_conv:.1f} %" if nb_devis else "N/A",
+            help=(
+                "**Formule** : Factures ÷ (Factures + Devis non transformés) × 100  \n"
+                "**Devis non transformés** : documents encore au stade de devis  \n"
+                "N/A s'il n'y a aucun devis sur la période  \n"
+                f"{periode_txt}"
+            ),
         )
         st.markdown(
             f"<span style='color:{sub_info_color};font-size:0.85rem;'>"
-            f"{nb_fac_conv} factures pour {nb_devis + nb_fac_conv} devis"
+            f"{nb_fac_conv} factures, {nb_devis} devis non transformés"
             f"</span>",
             unsafe_allow_html=True,
         )

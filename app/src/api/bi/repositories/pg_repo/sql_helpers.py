@@ -60,9 +60,11 @@ def add_date_range(
     """
     Ajoute un filtre de période sur une colonne date Sage (format YYYY-MM-DD ou timestamp).
     Utilisé par les repos BI qui filtrent sur do_date, dl_date etc.
+    Comparaison sur la partie date seule : un timestamp '2026-09-23 00:00:00' comparé
+    tel quel à '2026-09-23' serait exclu du dernier jour de la période.
     """
-    sql = add_gte(sql, f"CAST({col} AS TEXT)", date_from, params)
-    sql = add_lte(sql, f"CAST({col} AS TEXT)", date_to, params)
+    sql = add_gte(sql, f"LEFT(CAST({col} AS TEXT), 10)", date_from, params)
+    sql = add_lte(sql, f"LEFT(CAST({col} AS TEXT), 10)", date_to, params)
     return sql
 
 

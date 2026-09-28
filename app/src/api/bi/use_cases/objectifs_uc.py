@@ -12,7 +12,7 @@ import polars as pl
 
 from api.bi.schemas import ObjectifsResponse, ObjectifItem
 from api.bi.repositories.pg_repo.bi_dashboard_repo import PgBIDashboardRepository
-from api.bi.business_logic.kpi_calculations import prepare_docentete
+from api.bi.business_logic.kpi_calculations import prepare_docentete, _jour
 from api.bi.repositories.archive_repo.base_bi_archive import safe_float_col
 
 logger = logging.getLogger("api.bi.use_cases.objectifs")
@@ -51,15 +51,15 @@ def execute(client_schema: str) -> ObjectifsResponse:
             ytd_from = today.replace(month=1, day=1).isoformat()
             ytd_to   = today.isoformat()
 
-            # ── CA YTD ──────────────────────────────────────────────────────
+            # ── CA HT YTD (même base que le KPI « Chiffre d'Affaires ») ──────
             df_ytd = df_e.filter(
-                (pl.col("do_date").cast(pl.Utf8) >= ytd_from) &
-                (pl.col("do_date").cast(pl.Utf8) <= ytd_to)
+                (_jour() >= ytd_from) &
+                (_jour() <= ytd_to)
             )
             df_ca = df_ytd.filter(
                 (pl.col("do_domaine") == 0) & (pl.col("do_type").is_in([6, 7]))
             )
-            ca_mois = float(df_ca["do_totalttc_f"].sum() or 0.0)
+            ca_mois = float(df_ca["do_totalht_f"].sum() or 0.0)
 
             # ── Encours all-time ─────────────────────────────────────────────
             df_enc_base = df_e.filter(

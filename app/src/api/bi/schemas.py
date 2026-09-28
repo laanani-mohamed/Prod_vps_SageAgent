@@ -46,7 +46,7 @@ class LastUpdateResponse(BaseModel):
 class KPIData(BaseModel):
     chiffre_affaires: float = 0.0
     ca_n_minus_1: float = 0.0
-    ca_evolution_pct: float = 0.0
+    ca_evolution_pct: Optional[float] = None   # None si CA N-1 ≤ 0 (évolution non calculable)
     total_achats: float = 0.0
     valeur_stock: float = 0.0
     encours_clients: float = 0.0
