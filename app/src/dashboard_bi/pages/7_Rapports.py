@@ -259,11 +259,11 @@ with tab1:
                 
                 # Format columns based on grouping — only rename columns that exist
                 if grouping == "client":
-                    rename_map = {"do_tiers": "Code Client", "ct_intitule": "Nom Client", "ca_ttc": "CA TTC", "nb_factures": "Nb Factures"}
+                    rename_map = {"do_tiers": "Code Client", "ct_intitule": "Nom Client", "ca_ht": "CA HT", "nb_factures": "Nb Factures"}
                 elif grouping == "region":
-                    rename_map = {"ct_ville": "Région", "ca_ttc": "CA TTC", "nb_factures": "Nb Factures"}
+                    rename_map = {"ct_ville": "Région", "ca_ht": "CA HT", "nb_factures": "Nb Factures"}
                 elif grouping == "commercial":
-                    rename_map = {"co_no": "Code Collab.", "co_fullname": "Collaborateur", "ca_ttc": "CA TTC", "nb_factures": "Nb Factures"}
+                    rename_map = {"co_no": "Code Collab.", "co_fullname": "Collaborateur", "ca_ht": "CA HT", "nb_factures": "Nb Factures"}
                 else:
                     rename_map = {}
                 rename_map = {k: v for k, v in rename_map.items() if k in df.columns}
@@ -304,17 +304,17 @@ with tab1:
             )
             
         st.markdown("---")
-        total_ca = df_t1["CA TTC"].sum() if "CA TTC" in df_t1.columns else 0.0
+        total_ca = df_t1["CA HT"].sum() if "CA HT" in df_t1.columns else 0.0
         g_name = "Clients" if grp == "client" else ("Régions" if grp == "region" else "Collaborateurs")
 
         df_t1_sums = pd.DataFrame([{
             f"Nombre de {g_name}": len(df_t1),
-            "CA TTC Total": total_ca
+            "CA HT Total": total_ca
         }])
 
         st.markdown(f"**Chiffre d'Affaire en Général :**")
         st.dataframe(df_t1_sums.style.format({
-            "CA TTC Total": "{:,.2f}"
+            "CA HT Total": "{:,.2f}"
         }))
         
         st.markdown("**Chiffre d'Affaire en Détail :**")
@@ -370,8 +370,8 @@ with tab2:
             if not df1.empty and not df2.empty:
                 join_keys = [k for k in join_keys if k in df1.columns and k in df2.columns]
 
-            if df1.empty: df1 = pd.DataFrame(columns=join_keys + ["ca_ttc"])
-            if df2.empty: df2 = pd.DataFrame(columns=join_keys + ["ca_ttc"])
+            if df1.empty: df1 = pd.DataFrame(columns=join_keys + ["ca_ht"])
+            if df2.empty: df2 = pd.DataFrame(columns=join_keys + ["ca_ht"])
 
             df_merged = pd.merge(df1, df2, on=join_keys, how="outer", suffixes=('_p1', '_p2'))
             
@@ -386,19 +386,19 @@ with tab2:
                 col_name_mapping['ct_intitule'] = 'Nom Client'
                 
             df_merged = df_merged.fillna(0)
-            df_merged['Ecart (MAD)'] = df_merged['ca_ttc_p2'] - df_merged['ca_ttc_p1']
+            df_merged['Ecart (MAD)'] = df_merged['ca_ht_p2'] - df_merged['ca_ht_p1']
 
             def calc_pct(row):
-                if row['ca_ttc_p1'] == 0 and row['ca_ttc_p2'] > 0: return 100.0
-                if row['ca_ttc_p1'] == 0 and row['ca_ttc_p2'] == 0: return 0.0
-                return (row['Ecart (MAD)'] / row['ca_ttc_p1']) * 100
+                if row['ca_ht_p1'] == 0 and row['ca_ht_p2'] > 0: return 100.0
+                if row['ca_ht_p1'] == 0 and row['ca_ht_p2'] == 0: return 0.0
+                return (row['Ecart (MAD)'] / row['ca_ht_p1']) * 100
 
             df_merged['Evolution (%)'] = df_merged.apply(calc_pct, axis=1)
 
             rename_dict = col_name_mapping.copy()
             rename_dict.update({
-                "ca_ttc_p1": "CA Période 1",
-                "ca_ttc_p2": "CA Période 2"
+                "ca_ht_p1": "CA Période 1",
+                "ca_ht_p2": "CA Période 2"
             })
             df_show = df_merged.rename(columns=rename_dict)
             
