@@ -15,6 +15,7 @@ from config.etl_config import ARCHIVE_BASE_PATH
 from api.transactions.schemas import TransactionsRequest, TransactionsResponse
 from api.transactions.query_builder import build_transactions_query
 from map_data.reference.columns_order_number import COLUMNS_ORDER
+from api.common.archive_tsv import read_archive_tsv
 
 logger = logging.getLogger("api.transactions.service")
 
@@ -247,11 +248,7 @@ def _load_archive_file(archive_dir: str, table: str, timestamp: str) -> Optional
             content = f.read()
             if content.startswith(b"\xef\xbb\xbf"): content = content[3:]
         
-        df = pl.read_csv(
-            content, separator="\t", has_header=False, new_columns=columns,
-            quote_char=None, truncate_ragged_lines=True, infer_schema_length=0,
-            null_values=["", "NULL"], encoding="utf8-lossy",
-        )
+        df = read_archive_tsv(content, columns)
         # Nettoyage espace autour des noms de colonnes/donnees
         return df
     except Exception as e:

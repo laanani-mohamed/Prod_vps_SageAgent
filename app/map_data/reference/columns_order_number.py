@@ -16,6 +16,7 @@ COLUMNS_ORDER: dict[str, list[str]] = {
         "ar_ref",
         "as_qtesto",
         "de_no",
+        "as_montsto",   # montant du stock Sage — source unique de la valeur du stock
     ],
     "F_ARTICLE": [
         "ar_ref",
@@ -149,3 +150,7 @@ COLUMNS_ORDER: dict[str, list[str]] = {
 }
 
 COLUMNS_COUNT: dict[str, int] = {k: len(v) for k, v in COLUMNS_ORDER.items()}
+
+# Colonnes de fin ajoutées après coup : absentes des fichiers archivés avant leur ajout.
+# À la lecture d'une archive, elles sont complétées à NULL (l'ETL, lui, les exige).
+COLONNES_FIN_AJOUTEES: frozenset[str] = frozenset({"as_montsto"})

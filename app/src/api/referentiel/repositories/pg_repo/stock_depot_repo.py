@@ -15,16 +15,18 @@ class PgStockDepotRepository(BaseReferentielRepository):
         params: list = []
         cols = [
             "ar_ref", "ar_design", "fa_codefamille", "fa_intitule",
-            "de_no", "de_intitule", "as_qtesto",
+            "de_no", "de_intitule", "as_qtesto", "as_montsto",
             "ar_prixach", "ar_prixven",
             "valeur_stock_achat", "valeur_stock_vente",
             "ar_suivistock", "ar_sommeil", "u_intitule",
         ]
+        # valeur_stock_achat = montant du stock Sage (AS_MontSto), vide → 0
+        # valeur_stock_vente = qté × prix de vente (valeur de vente, pas un coût)
         sql = f"""
 SELECT stk.ar_ref, a.ar_design, a.fa_codefamille, f.fa_intitule,
-       stk.de_no, d.de_intitule, stk.as_qtesto,
+       stk.de_no, d.de_intitule, stk.as_qtesto, stk.as_montsto,
        a.ar_prixach, a.ar_prixven,
-       stk.as_qtesto * COALESCE(a.ar_prixach, 0)  AS valeur_stock_achat,
+       COALESCE(stk.as_montsto, 0)                AS valeur_stock_achat,
        stk.as_qtesto * COALESCE(a.ar_prixven, 0)  AS valeur_stock_vente,
        a.ar_suivistock, a.ar_sommeil, u.u_intitule
 FROM {schema}.f_artstock stk

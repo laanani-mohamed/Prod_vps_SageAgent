@@ -189,7 +189,7 @@ with km4:
             label="Valeur Stock",
             value=to_m_str(valeur_stock),
             help=(
-                "**Formule** : Σ (Quantité en stock × Prix d'achat de la fiche article), tous dépôts  \n"
+                "**Formule** : Σ montant du stock Sage (AS_MontSto), tous dépôts  \n"
                 "**Date** : état actuel du stock"
             ),
         )

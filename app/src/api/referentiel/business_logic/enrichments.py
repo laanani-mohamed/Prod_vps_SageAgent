@@ -27,14 +27,14 @@ def add_reste_a_payer(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
 def add_valeur_stock(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
-    Calcule valeur_stock_achat et valeur_stock_vente.
+    Calcule valeur_stock_achat (montant du stock Sage AS_MontSto, vide → 0)
+    et valeur_stock_vente (qté × prix de vente).
     Utilisé par : stock_depot_uc
     """
     for row in rows:
         qte = _to_float(row.get("as_qtesto"))
-        prix_ach = _to_float(row.get("ar_prixach"))
         prix_ven = _to_float(row.get("ar_prixven"))
-        row["valeur_stock_achat"] = round(qte * prix_ach, 4)
+        row["valeur_stock_achat"] = round(_to_float(row.get("as_montsto")), 4)
         row["valeur_stock_vente"] = round(qte * prix_ven, 4)
     return rows
 

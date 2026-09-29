@@ -278,7 +278,7 @@ Vue directe de **F_ARTSTOCK** enrichie avec F_ARTICLE, F_DEPOT et F_FAMILLE.
 - `qte_min=0.01` : articles effectivement en stock (> 0)
 - `fa_codefamille` : filtrer par famille
 
-Colonnes calculées : `valeur_stock_achat`, `valeur_stock_vente`
+Colonnes calculées : `valeur_stock_achat` (= AS_MontSto, montant du stock Sage), `valeur_stock_vente` (qté × prix de vente)
 
 **Source** : `db_latest` ou `archive`
     """,

@@ -8,6 +8,7 @@ import polars as pl
 from api.stock.repositories.base_repo import BaseStockRepository
 from config.etl_config import ARCHIVE_BASE_PATH
 from map_data.reference.columns_order_number import COLUMNS_ORDER
+from api.common.archive_tsv import read_archive_tsv
 
 logger = logging.getLogger("api.stock.repositories.archive")
 
@@ -98,18 +99,7 @@ class BaseArchiveStockRepository(BaseStockRepository):
                 if content.startswith(b"\xef\xbb\xbf"):
                     content = content[3:]
 
-            df = pl.read_csv(
-                content,
-                separator="\t",
-                has_header=False,
-                new_columns=columns,
-                quote_char=None,
-                truncate_ragged_lines=True,
-                infer_schema_length=0,
-                null_values=["", "NULL"],
-                encoding="utf8-lossy",
-            )
-            return df
+            return read_archive_tsv(content, columns)
         except Exception as e:
             logger.error(f"[Archive] Erreur lecture {filepath} : {e}")
             return None

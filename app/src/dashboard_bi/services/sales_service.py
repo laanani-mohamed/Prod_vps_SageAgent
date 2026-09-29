@@ -188,18 +188,6 @@ def get_monthly_sales_and_profit(client_schema: str, date_from: str, date_to: st
     return sales_monthly, profit_monthly
 
 
-def Valeur_stock(client_schema: str) -> float:
-    """Calcul de la valorisation totale du stock."""
-    from services.referentiel_service import get_articles
-    articles = get_articles(client_schema, limit=5000, filters={"with_stock": True})
-    total_val = 0.0
-    for art in articles:
-        qte = float(art.get("qte_stock_totale") or 0.0)
-        prix = float(art.get("ar_prixach") or 0.0)
-        total_val += qte * prix
-    return total_val
-
-
 def Encours_clients(client_schema: str, date_from: str, date_to: str) -> float:
     """Calcul de l'encours client total sur la période."""
     filters = {

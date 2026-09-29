@@ -21,7 +21,6 @@ from api.bi.business_logic.kpi_calculations import (
     calc_dettes_fournisseurs,
     calc_total_achats,
     calc_nb_clients_actifs,
-    calc_valeur_stock,
 )
 
 logger = logging.getLogger("api.bi.use_cases.dashboard")
@@ -58,17 +57,13 @@ def execute(req: DashboardRequest) -> DashboardResponse:
                     (kpis.chiffre_affaires - kpis.ca_n_minus_1) / kpis.ca_n_minus_1 * 100, 1
                 )
 
-    # Valorisation du stock (méthode spécifique du repo PG)
+    # Valorisation du stock : Σ AS_MontSto (montant du stock Sage), vide → 0
     try:
         stock_rows = repo.fetch_stock(req)
         if stock_rows:
             df_stock_raw = pl.from_dicts(stock_rows, infer_schema_length=500)
-            df_stock = df_stock_raw.with_columns([
-                safe_float_col(df_stock_raw, "as_qtesto").alias("as_qtesto_f"),
-                safe_float_col(df_stock_raw, "ar_prixach").alias("ar_prixach_f"),
-            ])
             kpis.valeur_stock = float(
-                (df_stock["as_qtesto_f"] * df_stock["ar_prixach_f"]).sum() or 0
+                safe_float_col(df_stock_raw, "as_montsto").sum() or 0
             )
     except Exception as exc:
         logger.warning("[BI/dashboard] Valorisation stock non disponible : %s", exc)

@@ -30,7 +30,7 @@ class PgStockInsightRepository(BaseStockRepository):
 
         # 2. Select columns
         select_cols = [
-            "a.ar_ref", "a.ar_design", "s.as_qtesto",
+            "a.ar_ref", "a.ar_design", "s.as_qtesto", "s.as_montsto",
             "a.ar_prixven", "a.ar_prixach", "a.fa_codefamille", "f.fa_intitule",
             "a.ar_suivistock", "a.ar_nature", "a.ar_type", "a.ar_sommeil",
             "s.de_no", "d.de_intitule",
@@ -38,7 +38,7 @@ class PgStockInsightRepository(BaseStockRepository):
             "(CURRENT_DATE - dl_max.max_do_date) AS nbr_jours_inactif"
         ]
         col_aliases = [
-            "ar_ref", "ar_design", "as_qtesto",
+            "ar_ref", "ar_design", "as_qtesto", "as_montsto",
             "ar_prixven", "ar_prixach", "fa_codefamille", "fa_intitule",
             "ar_suivistock", "ar_nature", "ar_type", "ar_sommeil",
             "de_no", "de_intitule", "derniere_date_vente", "nbr_jours_inactif"

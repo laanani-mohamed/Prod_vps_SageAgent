@@ -89,6 +89,7 @@
 | AR_ref | Référence de l’article | Chaîne Alphanumérique Maj. | 18 caractères |  F_ARTICLE |
 | as_qtesto | Qte en stock | Numérique : Réel double |
 | DE_NO | Numero de depot | Numérique : Entier |  | F_depot |
+| AS_MontSto | Montant du stock (valeur du stock) | Numérique : Réel double |
 
 ## 6-F_LOTSERIE
 

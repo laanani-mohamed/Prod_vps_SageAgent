@@ -78,6 +78,7 @@
 0     AR_ref  Référence de l’article  Chaîne Alphanumérique Maj.       18 caractères   F_ARTICLE
 1  as_qtesto            Qte en stock     Numérique : Réel double                 NaN         NaN
 2      DE_NO         Numero de depot          Numérique : Entier                 NaN     F_depot
+3 AS_MontSto        Montant du stock     Numérique : Réel double                 NaN         NaN
 
 --- Sheet: 6-F_LOTSERIE ---
               Nom                                                                             Signification             Type de données Domaine de validité    LIAISON

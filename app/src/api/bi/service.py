@@ -91,7 +91,7 @@ def get_rapport_visite(req: RapportVisiteClientRequest) -> RapportResponse:
 
 
 def get_valeur_stock(req: ValeurStockRequest) -> RapportResponse:
-    """Rapport Valeur du Stock (DL_CMUP × qté f_artstock)."""
+    """Rapport Valeur du Stock (Σ AS_MontSto de f_artstock)."""
     logger.info("[BI] rapport/valeur-stock | schema=%s", req.client_schema)
     return valeur_stock_uc.execute(req)
 

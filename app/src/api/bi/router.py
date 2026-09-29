@@ -231,7 +231,7 @@ def rapport_visite_client(
 @router.post(
     "/rapport/valeur-stock",
     response_model=RapportResponse,
-    summary="Rapport Valeur du Stock (DL_CMUP × qté par dépôt/famille/article)",
+    summary="Rapport Valeur du Stock (Σ AS_MontSto par dépôt/famille/article)",
 )
 def rapport_valeur_stock(
     req: ValeurStockRequest,

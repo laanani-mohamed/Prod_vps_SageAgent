@@ -108,7 +108,7 @@ class RapportVisiteClientRequest(BaseBIRequest):
 
 
 class ValeurStockRequest(BaseBIRequest):
-    """Rapport Valeur du Stock (DL_CMUP × qté f_artstock)."""
+    """Rapport Valeur du Stock (Σ AS_MontSto de f_artstock)."""
     pass
 
 

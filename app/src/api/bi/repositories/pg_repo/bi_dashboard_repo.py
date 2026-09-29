@@ -57,15 +57,15 @@ WHERE 1=1""".strip()
     def _build_stock_query(self, req, schema: str) -> Tuple[str, List[Any], List[str]]:
         params: list = []
 
-        col_aliases = ["ar_ref", "as_qtesto", "ar_prixach"]
+        # Valeur du stock = montant du stock Sage (AS_MontSto) par article × dépôt
+        col_aliases = ["ar_ref", "as_qtesto", "as_montsto"]
 
         sql = f"""
 SELECT
-    a.ar_ref,
+    s.ar_ref,
     s.as_qtesto,
-    a.ar_prixach
-FROM {schema}.f_article a
-LEFT JOIN {schema}.f_artstock s ON s.ar_ref = a.ar_ref
+    s.as_montsto
+FROM {schema}.f_artstock s
 WHERE 1=1""".strip()
 
         return sql, params, col_aliases

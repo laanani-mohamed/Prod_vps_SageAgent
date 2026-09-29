@@ -58,6 +58,15 @@ def render_multi_export_buttons(sections: list, filename_base: str, pdf_title: s
         )
 
 
+def evolution_pct(p1: float, p2: float) -> float:
+    """Évolution de P1 à P2 en %. Le CA peut être négatif (avoirs Sage) :
+    P1 = 0 → +100 % / −100 % / 0 % selon le signe de P2 ; sinon (P2 − P1) ÷ |P1| × 100,
+    pour qu'une hausse reste positive même quand P1 est négatif."""
+    if p1 == 0:
+        return 0.0 if p2 == 0 else (100.0 if p2 > 0 else -100.0)
+    return (p2 - p1) / abs(p1) * 100
+
+
 def filtre_commercial(df: pd.DataFrame, key: str):
     """Selectbox "Commercial" alimenté par les commerciaux des factures (F_DOCENTETE.co_no,
     0 → "Non identifié") ; retourne (df filtré, libellé choisi)."""
@@ -414,12 +423,9 @@ with tab2:
             df_merged = df_merged.fillna(0)
             df_merged['Ecart (MAD)'] = df_merged['ca_ht_p2'] - df_merged['ca_ht_p1']
 
-            def calc_pct(row):
-                if row['ca_ht_p1'] == 0 and row['ca_ht_p2'] > 0: return 100.0
-                if row['ca_ht_p1'] == 0 and row['ca_ht_p2'] == 0: return 0.0
-                return (row['Ecart (MAD)'] / row['ca_ht_p1']) * 100
-
-            df_merged['Evolution (%)'] = df_merged.apply(calc_pct, axis=1)
+            df_merged['Evolution (%)'] = df_merged.apply(
+                lambda row: evolution_pct(row['ca_ht_p1'], row['ca_ht_p2']), axis=1
+            )
 
             rename_dict = col_name_mapping.copy()
             rename_dict.update({
@@ -477,7 +483,7 @@ with tab2:
         total_p1 = df_t2["CA Période 1"].sum() if "CA Période 1" in df_t2.columns else 0.0
         total_p2 = df_t2["CA Période 2"].sum() if "CA Période 2" in df_t2.columns else 0.0
         ecart = total_p2 - total_p1
-        evo = (ecart / total_p1 * 100) if total_p1 > 0 else 0.0
+        evo = evolution_pct(total_p1, total_p2)
         
         df_cmp_sums = pd.DataFrame([{
             "CA P1 Total": total_p1,

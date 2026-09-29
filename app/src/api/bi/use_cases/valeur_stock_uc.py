@@ -2,7 +2,7 @@
 api/bi/use_cases/valeur_stock_uc.py
 
 Use Case : POST /api/bi/rapport/valeur-stock
-Retourne le stock valorisé (DL_CMUP × qté) par dépôt/famille/article.
+Retourne le stock valorisé (Σ AS_MontSto, montant du stock Sage) par dépôt/famille/article.
 """
 from __future__ import annotations
 import logging

@@ -12,7 +12,6 @@ Couvre :
   - Encours clients
   - Dettes fournisseurs
   - Achats
-  - Valorisation du stock
   - Nombre de clients actifs
 """
 from __future__ import annotations
@@ -152,22 +151,3 @@ def calc_nb_clients_actifs(df_e: pl.DataFrame, date_from: Optional[str], date_to
         df = df.filter(_jour() <= date_to)
     df_ca = df.filter((pl.col("do_domaine") == 0) & pl.col("do_type").is_in([6, 7]))
     return df_ca["do_tiers"].n_unique()
-
-
-def calc_valeur_stock(df_stock: pl.DataFrame, df_article: pl.DataFrame) -> float:
-    """Valorise le stock : SUM(as_qtesto × ar_prixach) via jointure F_ARTSTOCK × F_ARTICLE."""
-    try:
-        df_s = df_stock.with_columns(
-            pl.col("as_qtesto").cast(pl.Float64, strict=False).fill_null(0.0)
-        )
-        df_a = df_article.select(["ar_ref", "ar_prixach"]).with_columns(
-            pl.col("ar_prixach").cast(pl.Float64, strict=False).fill_null(0.0)
-        )
-        df_merged = df_s.join(df_a, on="ar_ref", how="left")
-        df_merged = df_merged.with_columns(
-            (pl.col("as_qtesto") * pl.col("ar_prixach")).alias("valeur")
-        )
-        return float(df_merged["valeur"].sum() or 0)
-    except Exception as e:
-        logger.warning("[BI] Impossible de valoriser le stock : %s", e)
-        return 0.0

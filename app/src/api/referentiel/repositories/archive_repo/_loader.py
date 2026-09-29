@@ -21,6 +21,7 @@ import polars as pl
 
 from config.etl_config import ARCHIVE_BASE_PATH
 from map_data.reference.columns_order_number import COLUMNS_ORDER
+from api.common.archive_tsv import read_archive_tsv
 
 logger = logging.getLogger("api.referentiel.repositories.archive")
 
@@ -134,17 +135,7 @@ def load_archive_file(
             if content.startswith(b"\xef\xbb\xbf"):
                 content = content[3:]
 
-        return pl.read_csv(
-            content,
-            separator="\t",
-            has_header=False,
-            new_columns=columns,
-            quote_char=None,
-            truncate_ragged_lines=True,
-            infer_schema_length=0,
-            null_values=["", "NULL"],
-            encoding="utf8-lossy",
-        )
+        return read_archive_tsv(content, columns)
     except Exception as e:
         logger.warning(f"[Archive] Impossible de charger {table}_{timestamp}.txt : {e}")
         return None
