@@ -7,7 +7,8 @@ import streamlit as st
 
 from services.log_reader import list_clients, list_dates, read_log_lines
 from services.run_status import list_runs_for_day
-from components.investigation_view import render_investigation
+from services.client_message import enrich_with_client_message
+from components.investigation_view import render_investigation, render_client_message
 
 st.title("Investigation d'un échec")
 
@@ -32,7 +33,7 @@ if not run_summary:
     if not date_str:
         st.stop()
 
-    runs = list_runs_for_day(client, date_str, read_log_lines(client, date_str))
+    runs = enrich_with_client_message(client, list_runs_for_day(client, date_str, read_log_lines(client, date_str)))
     failed_runs = [r for r in runs if r["status"] == "FAILED"]
     if not failed_runs:
         st.info("Aucun run en échec pour ce client/cette date.")
@@ -42,4 +43,7 @@ if not run_summary:
     choice = st.selectbox("Run en échec", list(options.keys()))
     run_summary = options[choice]
 
+if "client_message_sent" not in run_summary:  # run transmis par session, non enrichi
+    enrich_with_client_message(client, [run_summary])
+render_client_message(run_summary)
 render_investigation(client, date_str, run_summary)

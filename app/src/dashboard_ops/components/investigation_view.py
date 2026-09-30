@@ -21,6 +21,21 @@ def _rows_table(rows, highlight_col=None):
     return df
 
 
+def render_client_message(run_summary: dict) -> None:
+    """Message envoyé au client pour ce run (ERREUR_*.txt), s'il y en a eu un."""
+    if not run_summary.get("client_message_sent"):
+        return
+    message = run_summary.get("client_message")
+    with st.expander("📩 Message envoyé au client", expanded=True):
+        if message:
+            st.code(message, language="text", wrap_lines=True)
+        else:
+            st.caption(
+                "Un message a été envoyé au client, mais le fichier n'est plus disponible "
+                "(supprimé du dossier d'upload, et envoyé avant l'archivage dans logs/message_client)."
+            )
+
+
 def render_investigation(client: str, date_str: str, run_summary: dict) -> None:
     """Affiche l'investigation complète d'un run en échec (aucune navigation de page)."""
     st.markdown(f"**Client :** {client} &nbsp;|&nbsp; **Run :** `{run_summary['run_id']}`")

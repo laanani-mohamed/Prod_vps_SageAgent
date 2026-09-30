@@ -29,6 +29,8 @@ ERROR_BASE_PATH = os.path.join(STORAGE_ROOT, "storage_srv", "error")
 LOGS_DIR = os.path.join(PROJECT_ROOT, "logs")
 ETL_LOG_DIR = os.path.join(LOGS_DIR, "etl.log")
 ETL_ERROR_LOG_DIR = os.path.join(LOGS_DIR, "etl_error.log")
+# Copie des messages envoyés au client : logs/message_client/<CLIENT>/<YYYY-MM-DD>/ERREUR_*.txt
+CLIENT_MESSAGE_LOG_DIR = os.path.join(LOGS_DIR, "message_client")
 
 # =========================
 # WATCHER CONFIG

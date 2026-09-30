@@ -12,7 +12,8 @@ import time
 import logging
 from datetime import datetime
 
-from config.etl_config import ERROR_REPORT_PREFIX, ERROR_REPORT_RETENTION_DAYS, error_report_filename
+from config.etl_config import ERROR_REPORT_PREFIX, ERROR_REPORT_RETENTION_DAYS, CLIENT_MESSAGE_LOG_DIR, error_report_filename
+from config.logging_config import _SAFE_FOLDER_PATTERN, _GENERAL_LOG_FOLDER
 
 logger = logging.getLogger("etl.reporting.error_report")
 
@@ -114,20 +115,50 @@ def write_error_report(folder_path: str, client_schema: str, run_id: str, detail
     if not detail:
         detail = {"error_code": "UNKNOWN_ERROR"}
 
-    report_path = os.path.join(folder_path, error_report_filename())
+    filename = error_report_filename()
+    message = _build_message(detail, run_id)
+    report_path = os.path.join(folder_path, filename)
+    message_log_path = _archive_client_message(filename, message, client_schema, run_id)
     try:
-        message = _build_message(detail, run_id)
         with open(report_path, "w", encoding="utf-8") as f:
             f.write(message)
+        # error_code journalisé ici : les rejets du watcher n'ont aucune autre ligne qui le porte
         logger.info(
             f"Rapport d'erreur écrit : {report_path}",
-            extra={"run_id": run_id, "client": client_schema, "path": report_path, "step": "error_report_written"},
+            extra={
+                "run_id": run_id, "client": client_schema, "path": report_path,
+                "message_log_path": message_log_path, "error_code": detail.get("error_code"),
+                "step": "error_report_written",
+            },
         )
     except OSError as e:
         logger.warning(
             f"Impossible d'écrire le rapport d'erreur dans {folder_path} : {e}",
             extra={"run_id": run_id, "client": client_schema, "path": folder_path, "step": "error_report_failed"},
         )
+
+
+def _archive_client_message(filename: str, message: str, client_schema: str, run_id: str):
+    """
+    Copie du message envoyé au client dans les logs, rangée comme les autres logs :
+    logs/message_client/<CLIENT>/<YYYY-MM-DD>/ERREUR_YYYYMMDD_HHMMSS.txt
+    Conservée même quand le client supprime le fichier de son dossier d'upload.
+    Retourne le chemin écrit, ou None en cas d'échec.
+    """
+    client_dir = _SAFE_FOLDER_PATTERN.sub("_", client_schema or "") or _GENERAL_LOG_FOLDER
+    date_dir = os.path.join(CLIENT_MESSAGE_LOG_DIR, client_dir, datetime.now().strftime("%Y-%m-%d"))
+    log_path = os.path.join(date_dir, filename)
+    try:
+        os.makedirs(date_dir, exist_ok=True)
+        with open(log_path, "w", encoding="utf-8") as f:
+            f.write(message)
+        return log_path
+    except OSError as e:
+        logger.warning(
+            f"Impossible d'archiver le message client dans {date_dir} : {e}",
+            extra={"run_id": run_id, "client": client_schema, "path": date_dir, "step": "client_message_log_failed"},
+        )
+        return None
 
 
 def purge_old_error_reports(folder_path: str) -> None:

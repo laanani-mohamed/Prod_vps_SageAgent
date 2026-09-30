@@ -4,8 +4,9 @@ import pandas as pd
 
 from services.log_reader import list_clients, list_dates, read_log_lines
 from services.run_status import list_runs_for_day
+from services.client_message import enrich_with_client_message
 from components.status_badge import status_html
-from components.investigation_view import render_investigation
+from components.investigation_view import render_investigation, render_client_message
 
 st.title("Historique des uploads")
 
@@ -33,7 +34,7 @@ if not date_str:
 @st.cache_data(ttl=30)
 def _load_runs(client: str, date_str: str):
     lines = read_log_lines(client, date_str)
-    return list_runs_for_day(client, date_str, lines)
+    return enrich_with_client_message(client, list_runs_for_day(client, date_str, lines))
 
 
 runs = _load_runs(client, date_str)
@@ -63,6 +64,7 @@ df = pd.DataFrame([
         "Statut": r["status"],
         "Table / fichier": r.get("fichier") or r.get("table") or "—",
         "Error code": r.get("error_code") or "—",
+        "Message client": ("Oui" if r.get("client_message") else "Introuvable") if r.get("client_message_sent") else "—",
         "run_id": r["run_id"],
     }
     for r in runs
@@ -92,6 +94,8 @@ if selected_idx:
             }
     else:
         st.caption("Ce run n'est pas en échec — rien à investiguer.")
+
+    render_client_message(selected_run)
 
     with st.expander("Log brut de ce run"):
         st.json(selected_run["raw_lines"])
