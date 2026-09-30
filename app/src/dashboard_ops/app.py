@@ -38,11 +38,11 @@ logout_button()
 
 pages = {
     "Observabilité": [
-        st.Page("pages/1_Runs.py", title="Historique des runs"),
-        st.Page("pages/2_Investigation.py", title="Investigation"),
+        st.Page("views/1_Runs.py", title="Historique des runs"),
+        st.Page("views/2_Investigation.py", title="Investigation"),
     ],
     "Administration": [
-        st.Page("pages/3_Onboarding.py", title="Onboarding client"),
+        st.Page("views/3_Onboarding.py", title="Onboarding client"),
     ],
 }
 
