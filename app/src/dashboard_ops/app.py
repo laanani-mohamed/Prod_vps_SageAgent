@@ -38,8 +38,13 @@ logout_button()
 
 pages = {
     "Observabilité": [
+        st.Page("views/0_Synthese.py", title="Synthèse"),
         st.Page("views/1_Runs.py", title="Historique des runs"),
         st.Page("views/2_Investigation.py", title="Investigation"),
+    ],
+    "Exploitation": [
+        st.Page("views/4_Services.py", title="Services & stockage"),
+        st.Page("views/5_Acces_API.py", title="Accès API"),
     ],
     "Administration": [
         st.Page("views/3_Onboarding.py", title="Onboarding client"),

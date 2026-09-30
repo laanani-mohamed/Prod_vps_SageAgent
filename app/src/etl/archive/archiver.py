@@ -3,8 +3,21 @@ import os
 import shutil
 from datetime import datetime
 from config.etl_config import ARCHIVE_BASE_PATH, ERROR_BASE_PATH, ERROR_REPORT_PREFIX
+from etl.utils.file_stats import file_stats
 
 logger = logging.getLogger("etl.archiver")
+
+
+def _stats_fichiers(dest_path: str, filenames: list) -> list:
+    """Volumétrie des fichiers archivés, journalisée pour survivre à la purge des archives.
+    Ne fait jamais échouer l'archivage : un fichier illisible est simplement omis."""
+    stats = []
+    for name in filenames:
+        try:
+            stats.append(file_stats(os.path.join(dest_path, name)))
+        except OSError as e:
+            logger.warning(f"Volumétrie indisponible pour {name} : {e}")
+    return stats
 
 def archive_folder(folder_path: str, client_schema: str, success: bool = True, run_id: str = None):
     """
@@ -43,7 +56,9 @@ def archive_folder(folder_path: str, client_schema: str, success: bool = True, r
             status = "archivés" if success else "mis en quarantaine (error)"
             logger.info(f"{files_moved} fichier(s) {status} vers : {dest_path}",
                         extra={"run_id": run_id, "client": client_schema, "path": dest_path,
-                               "fichiers_archives": archived_filenames, "step": "archivage_success"})
+                               "fichiers_archives": archived_filenames,
+                               "fichiers_stats": _stats_fichiers(dest_path, archived_filenames),
+                               "step": "archivage_success"})
         else:
             logger.warning(f"Aucun fichier trouvé à déplacer dans {folder_path}", 
                            extra={"run_id": run_id, "client": client_schema, "path": folder_path, "step": "archivage_empty"})

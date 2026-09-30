@@ -5,6 +5,8 @@ import pandas as pd
 from services.log_reader import list_clients, list_dates, read_log_lines
 from services.run_status import list_runs_for_day
 from services.client_message import enrich_with_client_message
+from services.run_volumes import run_files
+from components.formatting import fmt_taille, fmt_entier
 from components.status_badge import status_html
 from components.investigation_view import render_investigation, render_client_message
 
@@ -96,6 +98,16 @@ if selected_idx:
         st.caption("Ce run n'est pas en échec — rien à investiguer.")
 
     render_client_message(selected_run)
+
+    fichiers = run_files(selected_run)
+    if fichiers:
+        st.markdown(f"#### Fichiers du run ({len(fichiers)} — {fmt_taille(sum(f['taille'] or 0 for f in fichiers))})")
+        st.dataframe(pd.DataFrame([{
+            "Fichier": f["fichier"],
+            "Lignes": fmt_entier(f["lignes"]),
+            "Colonnes": fmt_entier(f["colonnes"]),
+            "Taille": fmt_taille(f["taille"]) if f["disponible"] else "fichier purgé",
+        } for f in sorted(fichiers, key=lambda f: f["fichier"])]), width="stretch", hide_index=True)
 
     with st.expander("Log brut de ce run"):
         st.json(selected_run["raw_lines"])
