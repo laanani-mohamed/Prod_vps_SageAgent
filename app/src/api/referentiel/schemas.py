@@ -457,6 +457,7 @@ class DateRangeRequest(BaseReferentielRequest):
     do_domaine: List[int] = Field(default_factory=list, description="Domaine(s) : 0=Vente, 1=Achat, 2=Stock")
     do_type: List[int] = Field(default_factory=list, description="Type(s) de document")
     ar_ref: List[str] = Field(default_factory=list, description="Article(s), table 'docligne' uniquement")
+    do_tiers: List[str] = Field(default_factory=list, description="Tiers (client / fournisseur) du document")
 
     @field_validator("table")
     @classmethod

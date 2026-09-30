@@ -19,6 +19,7 @@ def get_date_bounds(
     domaine: Optional[list[int]] = None,
     do_type: Optional[list[int]] = None,
     ar_ref: Optional[list[str]] = None,
+    do_tiers: Optional[list[str]] = None,
 ) -> tuple[Optional[datetime.date], Optional[datetime.date]]:
     """(date_min, date_max) de do_date du document ciblé ; (None, None) si indisponible."""
     if not client_schema:
@@ -26,6 +27,7 @@ def get_date_bounds(
     payload = {
         "client_schema": client_schema, "source_type": SOURCE_TYPE, "table": table,
         "do_domaine": domaine or [], "do_type": do_type or [], "ar_ref": ar_ref or [],
+        "do_tiers": do_tiers or [],
     }
     try:
         row = (call_api("/api/referentiel/date-range", payload).get("data") or [{}])[0]

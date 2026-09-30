@@ -26,11 +26,15 @@ class ArchiveDateRangeRepository(BaseReferentielRepository):
             df_ent = load_archive_file(archive_dir, "F_DOCENTETE", ts)
             if df_ent is None:
                 return [{"date_min": None, "date_max": None, "__source_timestamp__": ts}]
-            df = df.select(_KEYS).join(df_ent.select(_KEYS + ["do_date"]), on=_KEYS, how="inner")
+            df = df.select(_KEYS).join(df_ent.select(_KEYS + ["do_date", "do_tiers"]), on=_KEYS, how="inner")
+            df = _keep_in(df, "do_tiers", req.do_tiers)
         else:
             df, ts = require_snapshot(archive_dir, "F_DOCLIGNE" if table == "docligne" else "F_DOCENTETE", req)
             if table == "docligne":
                 df = _keep_in(df, "ar_ref", req.ar_ref)
+                df = _keep_in(df, "ct_num", req.do_tiers)
+            else:
+                df = _keep_in(df, "do_tiers", req.do_tiers)
 
         df = _keep_in(df, "do_domaine", req.do_domaine)
         df = _keep_in(df, "do_type", req.do_type)

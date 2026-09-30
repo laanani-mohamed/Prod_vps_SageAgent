@@ -22,6 +22,8 @@ from services.article_service import get_article_top_clients, get_article_stock_
 from services.documents_service import get_date_bounds
 from services.tiers_service import search_comptes_tiers
 from services.depot_service import get_depots_summary
+from services.bi_service import get_stats_tiers
+from components.tiers_stats import render_client_stats, render_fournisseur_stats
 
 st.header("Fichier de Base")
 
@@ -75,6 +77,42 @@ def fetch_base_options(schema):
         return {"art_des": ["Tout"], "art_ref": ["Tout"], "cli_nom": ["Tout"], "cli_ref": ["Tout"], "fou_nom": ["Tout"], "fou_ref": ["Tout"], "fam_int": ["Tout"], "fam_code": ["Tout"]}
 
 base_opts = fetch_base_options(client_schema)
+
+
+def render_tiers_detail(df_tiers: pd.DataFrame, selection, ct_type: int, key: str) -> None:
+    """Statistiques du tiers sélectionné (ct_type 0 = client, 1 = fournisseur) sur une période."""
+    rows = selection.get("selection", {}).get("rows", [])
+    if not rows:
+        return
+    code = df_tiers.iloc[rows[0]]["CODE CLIENT"]
+    nom = df_tiers.iloc[rows[0]]["RAISON SOCIALE"]
+    st.divider()
+    st.markdown(f"#### Statistiques du {'client' if ct_type == 0 else 'fournisseur'} : **{code} - {nom}**")
+
+    import datetime
+    # Bornes : factures de ce tiers (vente 6/7, achat 16/17)
+    t_min, t_max = get_date_bounds(client_schema, "docentete", [ct_type], [6, 7] if ct_type == 0 else [16, 17],
+                                   do_tiers=[code])
+    if t_min is None:
+        st.info("Aucune facture pour ce tiers.")
+        return
+    st.markdown("**Période d'analyse**")
+    d_from, d_to, dates_ok = date_range_filter(
+        f"{key}_date_from", f"{key}_date_to", t_min, t_max,
+        default_from=datetime.date.today().replace(month=1, day=1), default_to=datetime.date.today(),
+    )
+    if not dates_ok:
+        return
+    try:
+        with st.spinner(f"Calcul des statistiques de {code}..."):
+            stats = get_stats_tiers(client_schema, code, ct_type, str(d_from), str(d_to))
+    except Exception as e:
+        handle_auth_error(e)
+        stats = {}
+    if not stats.get("kpis"):
+        st.info("Statistiques indisponibles pour ce tiers.")
+        return
+    (render_client_stats if ct_type == 0 else render_fournisseur_stats)(stats, key)
 
 # ---------------------------------------------------------------------------
 # Tab 1 : Articles
@@ -276,7 +314,9 @@ with tab2:
         )
     
     if not df_tiers.empty:
-        show_df(df_tiers, key_suffix="Clients")
+        st.markdown("*Cliquez sur un client pour voir ses statistiques.*")
+        selection_cli = show_df(df_tiers, on_select="rerun", selection_mode="single-row", key_suffix="Clients")
+        render_tiers_detail(df_tiers, selection_cli, 0, "stat_cli")
     else:
         st.info("Aucun compte Clients trouvé.")
 
@@ -303,7 +343,9 @@ with tab3:
         )
     
     if not df_tiers.empty:
-        show_df(df_tiers, key_suffix="Fournisseurs")
+        st.markdown("*Cliquez sur un fournisseur pour voir ses statistiques.*")
+        selection_fou = show_df(df_tiers, on_select="rerun", selection_mode="single-row", key_suffix="Fournisseurs")
+        render_tiers_detail(df_tiers, selection_fou, 1, "stat_fou")
     else:
         st.info("Aucun compte Fournisseurs trouvé.")
 

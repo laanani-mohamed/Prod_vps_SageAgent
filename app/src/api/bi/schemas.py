@@ -107,6 +107,21 @@ class RapportVisiteClientRequest(BaseBIRequest):
     date_to:   Optional[str] = Field(None, description="Date fin (YYYY-MM-DD) — défaut : aujourd'hui")
 
 
+class StatsTiersRequest(BaseBIRequest):
+    """Statistiques d'un client (ct_type=0) ou d'un fournisseur (ct_type=1) sur une période."""
+    ct_num: str = Field(..., description="Code du tiers (do_tiers / ct_num)")
+    ct_type: int = Field(..., description="0 = client, 1 = fournisseur")
+    date_from: str = Field(..., description="Date début YYYY-MM-DD")
+    date_to: str = Field(..., description="Date fin YYYY-MM-DD")
+
+    @field_validator("ct_type")
+    @classmethod
+    def validate_ct_type(cls, v):
+        if v not in (0, 1):
+            raise ValueError("ct_type doit valoir 0 (client) ou 1 (fournisseur)")
+        return v
+
+
 class ValeurStockRequest(BaseBIRequest):
     """Rapport Valeur du Stock (Σ AS_MontSto de f_artstock)."""
     pass

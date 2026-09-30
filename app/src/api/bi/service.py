@@ -16,7 +16,7 @@ from api.bi.schemas import (
     RapportCARequest, TopClientsRequest, TopArticlesRequest,
     RapportResponse, KpiAnalytiqueResponse,
     RapportVisiteClientRequest, ValeurStockRequest,
-    RapportConsommationRequest,
+    RapportConsommationRequest, StatsTiersRequest,
 )
 from api.bi.use_cases import (
     dashboard_uc,
@@ -31,6 +31,7 @@ from api.bi.use_cases import (
     valeur_stock_uc,
     consommation_uc,
     last_update_uc,
+    stats_tiers_uc,
 )
 
 logger = logging.getLogger("api.bi.service")
@@ -106,3 +107,9 @@ def get_balance_agee(req: BalanceClientRequest) -> RapportResponse:
     """Balance âgée par clients (tranches en jours : Non Échu, 0-30j, 31-60j, 61-90j, +90j)."""
     logger.info("[BI] rapport/balance-agee | schema=%s", req.client_schema)
     return balance_agee_uc.execute(req)
+
+
+def get_stats_tiers(req: StatsTiersRequest) -> RapportResponse:
+    """Statistiques d'un client ou d'un fournisseur sur une période (vs N-1)."""
+    logger.info("[BI] stats-tiers | schema=%s | tiers=%s | type=%s", req.client_schema, req.ct_num, req.ct_type)
+    return stats_tiers_uc.execute(req)

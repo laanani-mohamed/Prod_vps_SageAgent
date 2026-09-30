@@ -72,6 +72,37 @@ def apply_fichier_base_css():
             color: black !important;
         }
 
+        /* --- Cartes des statistiques client / fournisseur : copie des cartes « Indicateurs
+           Analytiques » kc1 → kc4 du Tableau de Bord (styles_initiale.py), dans le même ordre.
+           Clés "tstat-kcN-..." (uniques par carte), ciblées par préfixe de classe. --- */
+        div[class*="st-key-tstat-kc1-"], div[class*="st-key-tstat-kc2-"],
+        div[class*="st-key-tstat-kc3-"], div[class*="st-key-tstat-kc4-"] {
+            border: none !important;
+            border-radius: 20px !important;
+        }
+        div[class*="st-key-tstat-kc1-"] {
+            background: linear-gradient(135deg, #577399, #bdd5ea) !important;
+            box-shadow: 0 4px 20px rgba(131, 56, 236, 0.2) !important;
+        }
+        div[class*="st-key-tstat-kc2-"] {
+            background: linear-gradient(135deg, #bdd5ea, #bdd5ea) !important;
+            box-shadow: 0 4px 20px rgba(0, 95, 115, 0.2) !important;
+        }
+        div[class*="st-key-tstat-kc3-"] {
+            background: linear-gradient(135deg, #bdd5ea 30%, #fe5f55) !important;
+            box-shadow: 0 4px 20px rgba(226, 149, 120, 0.2) !important;
+        }
+        div[class*="st-key-tstat-kc4-"] {
+            background: linear-gradient(135deg, #fe5f55, #fe5f55) !important;
+            box-shadow: 0 4px 20px rgba(251, 86, 7, 0.2) !important;
+        }
+        div[class*="st-key-tstat-kc1-"] [data-testid="stMetric"] *,
+        div[class*="st-key-tstat-kc2-"] [data-testid="stMetric"] *,
+        div[class*="st-key-tstat-kc3-"] [data-testid="stMetric"] *,
+        div[class*="st-key-tstat-kc4-"] [data-testid="stMetric"] * {
+            color: white !important;
+        }
+
         /* Style the progress bar line (from km1) so it stands out */
         div.st-key-kpi1 [data-testid="stProgress"] > div {
             background-color: rgba(255, 255, 255, 0.3) !important;

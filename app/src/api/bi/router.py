@@ -20,13 +20,14 @@ from api.bi.schemas import (
     RapportCARequest, TopClientsRequest, TopArticlesRequest,
     RapportResponse, KpiAnalytiqueResponse, BalanceClientRequest,
     RapportVisiteClientRequest, ValeurStockRequest,
-    RapportConsommationRequest,
+    RapportConsommationRequest, StatsTiersRequest,
 )
 from api.bi.service import (
     get_dashboard, get_objectifs, get_analytique,
     get_rapport_ca, get_top_clients, get_top_articles,
     get_balance_client, get_rapport_visite, get_valeur_stock,
     get_rapport_consommation, get_balance_agee, get_last_update,
+    get_stats_tiers,
 )
 
 logger = logging.getLogger("api.bi.router")
@@ -281,6 +282,26 @@ def rapport_consommation(
     return secured_handle(
         get_rapport_consommation,
         endpoint="/api/bi/rapport/consommation",
+        request=request,
+        current_user=current_user,
+        client_schema=req.client_schema,
+        req=req
+    )
+
+
+@router.post(
+    "/stats-tiers",
+    response_model=RapportResponse,
+    summary="Statistiques d'un client ou d'un fournisseur sur une période (vs N-1)",
+)
+def stats_tiers(
+    req: StatsTiersRequest,
+    request: Request,
+    current_user: TokenData = Depends(require_role("analyst"))
+) -> RapportResponse:
+    return secured_handle(
+        get_stats_tiers,
+        endpoint="/api/bi/stats-tiers",
         request=request,
         current_user=current_user,
         client_schema=req.client_schema,

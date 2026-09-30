@@ -39,4 +39,7 @@ WHERE 1=1""".strip()
         sql = add_in(sql, f"{alias}.do_type", req.do_type, params)
         if table == "docligne":
             sql = add_in(sql, "l.ar_ref", req.ar_ref, params)
+            sql = add_in(sql, "l.ct_num", req.do_tiers, params)
+        else:
+            sql = add_in(sql, "e.do_tiers", req.do_tiers, params)
         return sql, params, ["date_min", "date_max"]

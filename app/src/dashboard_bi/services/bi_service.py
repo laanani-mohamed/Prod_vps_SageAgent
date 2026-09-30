@@ -62,6 +62,14 @@ def get_rapport_ca(
     return data.get("data", [])
 
 @cache_data(ttl=300)
+def get_stats_tiers(client_schema: str, ct_num: str, ct_type: int, date_from: str, date_to: str) -> dict:
+    """Appelle POST /api/bi/stats-tiers : statistiques d'un client (0) ou fournisseur (1) sur la période."""
+    payload = {"client_schema": client_schema, "ct_num": ct_num, "ct_type": ct_type,
+               "date_from": date_from, "date_to": date_to}
+    data = call_api("/api/bi/stats-tiers", payload)
+    return (data.get("data") or [{}])[0]
+
+@cache_data(ttl=300)
 def get_top_clients(
     client_schema: str,
     date_from: Optional[str] = None,
