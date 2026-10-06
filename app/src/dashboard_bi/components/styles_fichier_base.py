@@ -69,7 +69,7 @@ def apply_fichier_base_css():
         div.st-key-kpi1 [data-testid="stMetric"] *,
         div.st-key-kpi2 [data-testid="stMetric"] *,
         div.st-key-kc1 [data-testid="stMetric"] *{
-            color: black !important;
+            # color: black !important
         }
 
         /* --- Cartes des statistiques client / fournisseur : copie des cartes « Indicateurs
