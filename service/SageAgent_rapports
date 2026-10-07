@@ -1,0 +1,36 @@
+# Génération + envoi par email des rapports clients (exécution ponctuelle, lancée par SageAgent_rapports.timer).
+#   Rapports, filtres et destinataires : app/config/rapports_config.py
+#   Compte Gmail expéditeur            : app/.env.mail
+#   Fichiers déposés                   : storage_srv/rapport/<CLIENT>/<AAAA-MM-JJ>/
+#
+# Installation (une seule fois, avec le timer) :
+#   sudo cp /opt/SageAgent/service/SageAgent_rapports       /etc/systemd/system/SageAgent_rapports.service
+#   sudo cp /opt/SageAgent/service/SageAgent_rapports.timer /etc/systemd/system/SageAgent_rapports.timer
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now SageAgent_rapports.timer
+#
+# Lancer une génération + envoi tout de suite (sans attendre le planning) :
+#   sudo systemctl start SageAgent_rapports.service
+# Résultat de la dernière exécution / journal :
+#   systemctl status SageAgent_rapports.service
+#   journalctl -u SageAgent_rapports.service --since today
+
+[Unit]
+Description=Rapports clients Sage - generation et envoi par email
+# Base PostgreSQL pour les données, réseau pour Gmail
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+# Exécution ponctuelle : le service se termine à la fin du script (pas de Restart)
+Type=oneshot
+User=amohamed
+Group=amohamed
+WorkingDirectory=/opt/SageAgent/app
+ExecStart=/opt/SageAgent/app/.venv/bin/python /opt/SageAgent/app/src/reporting/generate.py
+
+# Garde-fou : une exécution bloquée (base, Gmail) est arrêtée au bout d'une heure
+TimeoutStartSec=1h
+
+# Empêche Python de retenir les logs en mémoire (journalctl)
+Environment=PYTHONUNBUFFERED=1

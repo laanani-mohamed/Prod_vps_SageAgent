@@ -1,0 +1,19 @@
+# Planning de SageAgent_rapports.service (installation : voir l'en-tête de service/SageAgent_rapports).
+#
+# Prochaines exécutions : systemctl list-timers SageAgent_rapports.timer
+# Tester une expression OnCalendar avant de la changer :
+#   systemd-analyze calendar --iterations=5 "Mon *-*-* 07:00:00 Africa/Casablanca"
+# Après modification : sudo cp ... /etc/systemd/system/ && sudo systemctl daemon-reload
+
+[Unit]
+Description=Planning des rapports clients Sage
+
+[Timer]
+# Tous les jours à 07:00, heure du Maroc (le serveur est en UTC ; le fuseau suit les changements d'heure)
+OnCalendar=*-*-* 07:00:00 Africa/Casablanca
+
+# Serveur éteint à l'heure prévue : l'exécution manquée est rattrapée au démarrage
+Persistent=true
+
+[Install]
+WantedBy=timers.target
