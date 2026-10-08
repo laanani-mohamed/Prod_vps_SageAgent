@@ -55,8 +55,9 @@ dans `2st_implementation`.
 | cross | cross.sageagent.test | 8506 | cross |
 | rousseau | rousseau.sageagent.test | 8507 | rousseau |
 | mms | mms.sageagent.test | 8508 | mms |
-| muliparts | muliparts.sageagent.test | 8509 | multipart |
+| muliparts | muliparts.sageagent.test | 8509 | muliparts |
 | client_01 | client_01.sageagent.test | 8510 | client_01 |
+| health | health.sageagent.test | 8511 | health |
 
 (8505 = service de production existant, non touché. 8000 = API FastAPI partagée, inchangée. 8585 = dashboard interne `dashboard_ops`, hors périmètre.)
 
