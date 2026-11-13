@@ -42,11 +42,13 @@ SELECT
     l.dl_montantht,
     a.fa_codefamille
 FROM {schema}.f_docligne l
+JOIN {schema}.f_docentete e ON e.do_domaine = l.do_domaine AND e.do_type = l.do_type AND e.do_piece = l.do_piece
 LEFT JOIN {schema}.f_article a ON a.ar_ref = l.ar_ref
 WHERE l.do_domaine = 0 AND l.do_type IN (6, 7)
   AND l.ar_ref IS NOT NULL""".strip()
 
         sql = add_date_range(sql, "l.do_date", req.date_from, req.date_to, params)
+        sql = add_in(sql, "COALESCE(e.co_no, 0)", getattr(req, "co_no", []), params)
 
         # Filtre optionnel par famille
         fa_filter = getattr(req, "fa_codefamille", None)

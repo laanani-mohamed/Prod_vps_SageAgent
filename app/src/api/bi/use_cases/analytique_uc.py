@@ -31,7 +31,7 @@ from api.bi.business_logic.analytique_calculations import (
 logger = logging.getLogger("api.bi.use_cases.analytique")
 
 
-def execute(client_schema: str, date_from: str, date_to: str) -> KpiAnalytiqueResponse:
+def execute(client_schema: str, date_from: str, date_to: str, co_no: list = None) -> KpiAnalytiqueResponse:
     result = KpiAnalytiqueResponse(
         client_schema=client_schema,
         periode_from=date_from,
@@ -55,6 +55,7 @@ def execute(client_schema: str, date_from: str, date_to: str) -> KpiAnalytiqueRe
                 self.date_from = None   # Le repo retourne tout, le filtre est fait en Polars
                 self.date_to   = None
                 self.source_type = "db_latest"
+                self.co_no = co_no or []   # commercial de l'entête ; vide = tous
 
         req = _Req()
         repo = PgBIAnalytiqueRepository()

@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Tuple
 
 from api.bi.repositories.base_bi_repo import BaseBIRepository
 from api.bi.repositories.pg_repo._executor import execute_query
-from api.bi.repositories.pg_repo.sql_helpers import validate_schema
+from api.bi.repositories.pg_repo.sql_helpers import validate_schema, co_no_filter
 
 # Types de documents Sage utilisés
 TYPES_FACTURE = {0: [6, 7], 1: [16, 17]}
@@ -28,6 +28,7 @@ _DATE = "LEFT(CAST({col} AS TEXT), 10)"
 
 def _in(values: List[int]) -> str:
     return ", ".join(str(int(v)) for v in values)
+
 
 
 class PgBIStatsTiersRepository(BaseBIRepository):
@@ -43,7 +44,7 @@ class PgBIStatsTiersRepository(BaseBIRepository):
     # ── Entêtes du tiers (factures, avoirs, devis, retours) sur [date_from, date_to] ──
     def fetch_entetes(self, req, types: List[int], date_from: str, date_to: str) -> List[Dict[str, Any]]:
         q = SimpleNamespace(client_schema=req.client_schema, ct_num=req.ct_num, ct_type=req.ct_type,
-                            types=types, date_from=date_from, date_to=date_to)
+                            types=types, date_from=date_from, date_to=date_to, co_no=req.co_no)
         return self._run(self._q_entetes, q)
 
     def _q_entetes(self, q, schema: str) -> Tuple[str, list, list]:
@@ -62,7 +63,7 @@ SELECT e.do_type, {d} AS do_date, e.do_piece,
 FROM {schema}.f_docentete e
 LEFT JOIN {schema}.f_collaborateur col ON col.co_no = e.co_no
 WHERE e.do_domaine = %s AND e.do_tiers = %s AND e.do_type IN ({_in(q.types)})
-  AND {d} >= %s AND {d} <= %s""".strip()
+  AND {d} >= %s AND {d} <= %s{co_no_filter(q.co_no)}""".strip()
         cols = ["do_type", "do_date", "do_piece", "do_totalht", "co_no", "co_fullname"]
         return sql, [q.ct_type, q.ct_num, q.date_from, q.date_to], cols
 
@@ -77,13 +78,13 @@ WHERE e.do_domaine = %s AND e.do_tiers = %s AND e.do_type IN ({_in(q.types)})
 SELECT COALESCE(SUM({reste}) FILTER (WHERE ROUND(CAST({reste} AS NUMERIC), 2) > 0), 0) AS solde,
        MAX({_DATE.format(col="e.do_date")}) AS derniere_facture
 FROM {schema}.f_docentete e
-WHERE e.do_domaine = %s AND e.do_tiers = %s AND e.do_type IN ({_in(TYPES_FACTURE[req.ct_type])})""".strip()
+WHERE e.do_domaine = %s AND e.do_tiers = %s AND e.do_type IN ({_in(TYPES_FACTURE[req.ct_type])}){co_no_filter(req.co_no)}""".strip()
         return sql, [req.ct_type, req.ct_num], ["solde", "derniere_facture"]
 
     # ── Lignes du tiers sur la période (factures ; + BL côté achat pour les délais) ──
     def fetch_lignes(self, req, types: List[int]) -> List[Dict[str, Any]]:
         q = SimpleNamespace(client_schema=req.client_schema, ct_num=req.ct_num, ct_type=req.ct_type,
-                            types=types, date_from=req.date_from, date_to=req.date_to)
+                            types=types, date_from=req.date_from, date_to=req.date_to, co_no=req.co_no)
         return self._run(self._q_lignes, q)
 
     def _q_lignes(self, q, schema: str) -> Tuple[str, list, list]:
@@ -99,7 +100,7 @@ JOIN {schema}.f_docentete e ON e.do_domaine = l.do_domaine AND e.do_type = l.do_
 LEFT JOIN {schema}.f_article a ON a.ar_ref = l.ar_ref
 LEFT JOIN {schema}.f_famille f ON f.fa_codefamille = a.fa_codefamille
 WHERE e.do_domaine = %s AND e.do_tiers = %s AND e.do_type IN ({_in(q.types)})
-  AND {d} >= %s AND {d} <= %s""".strip()
+  AND {d} >= %s AND {d} <= %s{co_no_filter(q.co_no)}""".strip()
         cols = ["do_domaine", "do_type", "do_date", "ar_ref", "designation", "famille",
                 "dl_qte", "dl_qtebl", "dl_montantht", "dl_prixunitaire", "dl_prixru", "dl_cmup", "ar_prixach",
                 "dl_datebc", "dl_datebl"]

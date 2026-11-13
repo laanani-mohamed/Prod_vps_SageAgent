@@ -10,10 +10,11 @@ import plotly.graph_objects as go
 
 from components.styles_initiale import apply_custom_css
 from components.data_tables import show_df
-from components.auth_guard import require_auth, handle_auth_error
+from components.auth_guard import require_auth, handle_auth_error, est_collaborateur, libelle, section_interdite
 
 apply_custom_css()
 require_auth()
+collab = est_collaborateur()   # achats, stock et fournisseurs : N/A / 🚫 (l'API renvoie None)
 
 from services.bi_service import get_dashboard_analytique, get_dashboard_kpis
 from services.top_client_service import get_top_clients_from_docentete
@@ -97,7 +98,7 @@ with st.spinner("Calcul des indicateurs principaux..."):
 # Taux d'atteinte calculés sur les montants affichés (même période, même base HT/TTC)
 pct_ca      = round(ca / OBJECTIF_CA * 100, 1)
 pct_encours = round(encours_clients / LIMITE_ENCOURS * 100, 1)
-pct_dettes  = round(dettes_fournisseurs / LIMITE_DETTES * 100, 1)
+pct_dettes  = round(dettes_fournisseurs / LIMITE_DETTES * 100, 1) if dettes_fournisseurs is not None else None
 
 st.caption(f"Période : du {ytd_from} au {ytd_to}")
 
@@ -106,7 +107,7 @@ st.caption(f"Période : du {ytd_from} au {ytd_to}")
 # ---------------------------------------------------------------------------
 def to_m_str(val):
     if not val and val != 0:
-        return "—"
+        return "N/A"
     n = float(val)
     if abs(n) >= 1_000_000:
         return f"{n / 1_000_000:.2f}".replace('.', ',') + " MMAD"
@@ -238,7 +239,7 @@ with km6:
                 margin-top: -10px; 
                 font-family: inherit;
             ">
-                {pct_dettes}% de la limite 20 MMAD
+                {f"{pct_dettes}% de la limite 20 MMAD" if pct_dettes is not None else "N/A"}
             </div>
             """
         )
@@ -362,7 +363,7 @@ with kc4:
 
 
 st.subheader("Classements")
-tab1, tab2, tab3 = st.tabs(["Top Clients", "Top Fournisseurs", "Top Familles"])
+tab1, tab2, tab3 = st.tabs(["Top Clients", libelle("Top Fournisseurs", not collab), "Top Familles"])
 
 with tab1:
     with st.container(border=True):
@@ -390,18 +391,22 @@ with tab1:
             })
             show_df(df_top_show, key_suffix="top_clients_2")
 
-with tab2:
-    with st.container(border=True):
-        top_fournisseurs_data = analytique.get("top_fournisseurs", [])
-        if top_fournisseurs_data:
-            df_top_f = pd.DataFrame(top_fournisseurs_data)
-            df_top_f_show = pd.DataFrame({
-                "Nom Fournisseur": df_top_f.get("ct_intitule", df_top_f.get("ct_num", [])),
-                "Encours (MAD)": pd.to_numeric(df_top_f.get("encours", pd.Series([0]*len(df_top_f))), errors="coerce").astype(float),
-            })
-            show_df(df_top_f_show, key_suffix="top_fournisseurs")
-        else:
-            st.info("Aucun encours fournisseur enregistré.")
+if not collab:
+    with tab2:
+        with st.container(border=True):
+            top_fournisseurs_data = analytique.get("top_fournisseurs", [])
+            if top_fournisseurs_data:
+                df_top_f = pd.DataFrame(top_fournisseurs_data)
+                df_top_f_show = pd.DataFrame({
+                    "Nom Fournisseur": df_top_f.get("ct_intitule", df_top_f.get("ct_num", [])),
+                    "Encours (MAD)": pd.to_numeric(df_top_f.get("encours", pd.Series([0]*len(df_top_f))), errors="coerce").astype(float),
+                })
+                show_df(df_top_f_show, key_suffix="top_fournisseurs")
+            else:
+                st.info("Aucun encours fournisseur enregistré.")
+else:
+    with tab2:
+        section_interdite()
 
 with tab3:
     with st.container(border=True):

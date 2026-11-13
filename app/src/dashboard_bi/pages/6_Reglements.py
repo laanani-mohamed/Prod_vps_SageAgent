@@ -9,7 +9,7 @@ import pandas as pd
 from components.styles_initiale import apply_custom_css
 from components.data_tables import show_df
 from components.date_filters import date_range_filter
-from components.auth_guard import require_auth, handle_auth_error, require_api_health
+from components.auth_guard import require_auth, handle_auth_error, require_api_health, est_collaborateur, libelle, section_interdite
 
 apply_custom_css()
 require_auth()
@@ -62,9 +62,10 @@ _date_to_str = str(date_to) if date_to else None
 # ---------------------------------------------------------------------------
 # Onglets principaux
 # ---------------------------------------------------------------------------
+collab = est_collaborateur()   # décaissements fournisseurs (achats) : 🚫
 tab_client, tab_fourn = st.tabs([
     "Encaissements Clients (Ventes)",
-    "Décaissements Fournisseurs (Achats)"
+    libelle("Décaissements Fournisseurs (Achats)", not collab),
 ])
 
 tab_configs = [
@@ -74,6 +75,9 @@ tab_configs = [
 
 for tab, domaine, key_prefix, code_col, intitule_col, do_type in tab_configs:
     with tab:
+        if collab and domaine == 1:
+            section_interdite()
+            continue
         st.subheader("Historique des Règlements" if domaine == 0 else "Historique des Décaissements")
         with st.spinner("Chargement des règlements..."):
             df_reg = get_formatted_reglements(

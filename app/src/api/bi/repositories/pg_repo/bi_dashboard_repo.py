@@ -9,7 +9,7 @@ from typing import Tuple, List, Dict, Any
 
 from api.bi.repositories.base_bi_repo import BaseBIRepository
 from api.bi.repositories.pg_repo._executor import execute_query
-from api.bi.repositories.pg_repo.sql_helpers import validate_schema, add_date_range
+from api.bi.repositories.pg_repo.sql_helpers import validate_schema, add_date_range, add_in
 
 
 class PgBIDashboardRepository(BaseBIRepository):
@@ -51,6 +51,7 @@ SELECT
     e.do_piece
 FROM {schema}.f_docentete e
 WHERE 1=1""".strip()
+        sql = add_in(sql, "COALESCE(e.co_no, 0)", getattr(req, "co_no", []), params)
 
         return sql, params, col_aliases
 

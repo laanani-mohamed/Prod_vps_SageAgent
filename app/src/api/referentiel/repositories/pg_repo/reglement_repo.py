@@ -32,6 +32,7 @@ WHERE 1=1""".strip()
         sql = add_in(sql, "r.rg_typereg", req.rg_typereg, params)
         sql = add_gte(sql, "e.do_date", req.date_from, params)
         sql = add_lte(sql, "e.do_date", req.date_to, params)
+        sql = add_in(sql, "COALESCE(e.co_no, 0)", req.co_no, params)   # commercial de l'entête
 
         sql += f" ORDER BY e.do_date DESC, r.rg_no DESC"
         return sql, params, cols

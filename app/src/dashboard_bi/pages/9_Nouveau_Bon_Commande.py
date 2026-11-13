@@ -8,6 +8,7 @@ matérialise par un PDF récapitulatif.
 import re
 import datetime
 import streamlit as st
+from utils.cache import cache_data   # cache par périmètre (schéma, rôle, co_no)
 import pandas as pd
 
 from components.styles_initiale import apply_custom_css
@@ -43,7 +44,7 @@ def oublier_widgets_ligne(ref: str) -> None:
         st.session_state.pop(prefixe + ref, None)
 
 
-@st.cache_data(ttl=300, show_spinner=False)
+@cache_data(ttl=300, show_spinner=False)
 def fetch_clients_et_familles(schema: str):
     clients = get_comptes_tiers(schema, limit=50000, filters={"ct_type": [0]})
     familles = get_familles(schema, limit=5000)

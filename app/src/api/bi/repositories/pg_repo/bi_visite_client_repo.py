@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Tuple
 
 from api.bi.repositories.base_bi_repo import BaseBIRepository
 from api.bi.repositories.pg_repo._executor import execute_query
-from api.bi.repositories.pg_repo.sql_helpers import validate_schema
+from api.bi.repositories.pg_repo.sql_helpers import validate_schema, co_no_filter
 
 
 class PgBIVisiteClientRepository(BaseBIRepository):
@@ -41,7 +41,7 @@ SELECT
 FROM {schema}.f_docentete e
 WHERE e.do_domaine = 0
   AND e.do_type = 1
-  AND e.do_tiers = %s
+  AND e.do_tiers = %s{co_no_filter(req.co_no)}
 ORDER BY e.do_date DESC
 """.strip()
         return sql, [req.do_tiers], col_aliases
@@ -64,7 +64,7 @@ SELECT
 FROM {schema}.f_docentete e
 WHERE e.do_domaine = 0
   AND e.do_type IN (6, 7)
-  AND e.do_tiers = %s
+  AND e.do_tiers = %s{co_no_filter(req.co_no)}
   AND ROUND(CAST(COALESCE(e.do_totalttc, 0) - COALESCE(e.do_montantregle, 0) AS NUMERIC), 2) > 0
 ORDER BY e.do_date DESC
 """.strip()
@@ -91,7 +91,7 @@ JOIN {schema}.f_docentete e ON e.do_piece = l.do_piece
   AND e.do_domaine = l.do_domaine AND e.do_type = l.do_type
 WHERE e.do_domaine = 0
   AND e.do_type IN (6, 7)
-  AND e.do_tiers = %s
+  AND e.do_tiers = %s{co_no_filter(req.co_no)}
   AND LEFT(CAST(e.do_date AS TEXT), 10) >= %s
   AND LEFT(CAST(e.do_date AS TEXT), 10) <= %s
 ORDER BY ar_ref, do_date
@@ -119,7 +119,7 @@ LEFT JOIN {schema}.f_article  a ON a.ar_ref = l.ar_ref
 LEFT JOIN {schema}.f_famille  f ON f.fa_codefamille = a.fa_codefamille
 WHERE e.do_domaine = 0
   AND e.do_type IN (6, 7)
-  AND e.do_tiers = %s
+  AND e.do_tiers = %s{co_no_filter(req.co_no)}
 GROUP BY a.fa_codefamille, f.fa_intitule
 ORDER BY ca_ht DESC
 """.strip()

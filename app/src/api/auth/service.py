@@ -33,6 +33,7 @@ def create_access_token(user: UserInDB) -> str:
         "sub": user.username,
         "roles": user.roles,
         "schemas": user.allowed_schemas,
+        "co_no": user.co_no,
         "exp": expire,
         "iat": datetime.now(timezone.utc),
         "jti": jti,
@@ -84,7 +85,8 @@ def verify_access_token(token: str) -> Optional[TokenData]:
         return TokenData(
             username=username,
             roles=payload.get("roles", []),
-            allowed_schemas=payload.get("schemas", [])
+            allowed_schemas=payload.get("schemas", []),
+            co_no=payload.get("co_no"),
         )
     except JWTError:
         return None

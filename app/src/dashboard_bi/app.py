@@ -139,6 +139,10 @@ if "access_token" not in st.session_state:
                                     decoded_payload = base64.urlsafe_b64decode(payload_part).decode("utf-8")
                                     payload = json.loads(decoded_payload)
                                     
+                                    # Profil (directeur | collaborateur) : pilote l'affichage des pages
+                                    st.session_state.roles = payload.get("roles", [])
+                                    st.session_state.co_no = payload.get("co_no")
+
                                     schemas = payload.get("schemas", [])
                                     if schemas:
                                         # Assigner le premier schéma de la liste
@@ -187,6 +191,18 @@ else:
     # ---------------------------------------------------------------------------
     # Définition des pages
     # ---------------------------------------------------------------------------
+    # Collaborateur : achats et stock visibles dans le menu avec 🚫, la page affiche le refus (require_directeur)
+    from components.auth_guard import est_collaborateur, INTERDIT
+    interdit = INTERDIT if est_collaborateur() else None
+
+    # Un rapport = une entrée de menu, toutes servies par pages/7_Rapports.py (rapport choisi : rapport_actif)
+    RAPPORTS = [
+        "1. Chiffre d'Affaire", "2. Comparaison CA", "3. Balance", "4. Valeur du Stock",
+        "5. Avant Visite Client", "6. Produits Dormants", "7. Lots en Péremption",
+        "8. Consommation par Produit", "9. Balance Âgée",
+    ]
+    RAPPORTS_STOCK = (4, 6, 7, 8)   # 🚫 pour un collaborateur
+
     pages = {
         "Global": [
             st.Page("pages/1_Tableau_de_Bord.py", title="Tableau de Bord"),
@@ -196,14 +212,18 @@ else:
         ],
         "Transactions": [
             st.Page("pages/3_Gestion_Ventes.py",  title="Gestion Ventes"),
-            st.Page("pages/4_Gestion_Achats.py",  title="Gestion Achats"),
+            st.Page("pages/4_Gestion_Achats.py",  title="Gestion Achats", icon=interdit),
         ],
         "Stock": [
-            st.Page("pages/5_Mouvements_Stock.py", title="Stock & Mouvements"),
+            st.Page("pages/5_Mouvements_Stock.py", title="Stock & Mouvements", icon=interdit),
         ],
         "Finance": [
             st.Page("pages/6_Reglements.py", title="Règlements"),
-            st.Page("pages/7_Rapports.py",   title="Rapports BI"),
+        ],
+        "Rapports": [
+            st.Page("pages/7_Rapports.py", title=titre, url_path=f"rapport_{i}",
+                    icon=interdit if i in RAPPORTS_STOCK else None)
+            for i, titre in enumerate(RAPPORTS, 1)
         ],
         "Passer bon de commande": [
             st.Page("pages/9_Nouveau_Bon_Commande.py", title="Passer bon de commande"),
@@ -211,4 +231,9 @@ else:
     }
 
     pg = st.navigation(pages)
+    st.session_state.rapport_actif = int(pg.url_path.split("_")[1]) if pg.url_path.startswith("rapport_") else None
     pg.run()
+
+
+revenant au onboarding je veux creer 2 partie une pour les client avec les meme infos on suprimant identifiant collaborateur 
+et un autre champ pour creer profil on va laisser nom du client login shema port profil identifiant

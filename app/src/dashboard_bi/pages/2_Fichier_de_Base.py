@@ -4,15 +4,17 @@ Page 2 — Fichier de Base (Articles, Clients, Dépôts, Familles, Lots, Collabo
 """
 import os
 import streamlit as st
+from utils.cache import cache_data   # cache par périmètre (schéma, rôle, co_no)
 import pandas as pd
 from components.styles_fichier_base import apply_fichier_base_css
 from components.data_tables import show_df
 from components.date_filters import date_range_filter
 from components.charts import render_product_evolution_chart
-from components.auth_guard import require_auth, handle_auth_error, require_api_health
+from components.auth_guard import require_auth, handle_auth_error, require_api_health, est_collaborateur, libelle, section_interdite
 
 apply_fichier_base_css()
 require_auth()
+collab = est_collaborateur()   # fournisseurs et stock par dépôt : 🚫
 
 from services.referentiel_service import (
     get_articles, get_comptes_tiers, get_depots,
@@ -34,13 +36,13 @@ with st.sidebar:
 require_api_health()
 
 tab1, tab2, tab3, tab4, tab5 = st.tabs(
-    ["Articles", "Clients", "Fournisseurs", "Dépôts", "Familles"]
+    ["Articles", "Clients", libelle("Fournisseurs", not collab), libelle("Dépôts", not collab), "Familles"]
 )
 
 # ---------------------------------------------------------------------------
 # Options des filtres
 # ---------------------------------------------------------------------------
-@st.cache_data(ttl=300, show_spinner=False)
+@cache_data(ttl=300, show_spinner=False)
 def fetch_base_options(schema):
     if not schema:
         return {"art_des": ["Tout"], "art_ref": ["Tout"], "cli_nom": ["Tout"], "cli_ref": ["Tout"], "fou_nom": ["Tout"], "fou_ref": ["Tout"], "fam_int": ["Tout"], "fam_code": ["Tout"]}
@@ -188,14 +190,19 @@ with tab1:
                 else:
                     st.info("Aucune vente client exploitable trouvée.")
                     
-            with c_stock:
-                st.markdown("**Détail du Stock (Dépôts)**")
-                with st.spinner("Chargement des dépôts..."):
-                    df_dep = get_article_stock_depots(client_schema, selected_ar_ref)
-                if not df_dep.empty:
-                    show_df(df_dep, key_suffix="art_dep")
-                else:
-                    st.info("Aucune information de stock ou de dépôt disponible.")
+            if not collab:
+                with c_stock:
+                    st.markdown("**Détail du Stock (Dépôts)**")
+                    with st.spinner("Chargement des dépôts..."):
+                        df_dep = get_article_stock_depots(client_schema, selected_ar_ref)
+                    if not df_dep.empty:
+                        show_df(df_dep, key_suffix="art_dep")
+                    else:
+                        st.info("Aucune information de stock ou de dépôt disponible.")
+            else:
+                with c_stock:
+                    st.markdown(f"**{libelle('Détail du Stock (Dépôts)', False)}**")
+                    section_interdite()
 
             st.divider()
             st.markdown("**Statistiques Produit**")
@@ -323,44 +330,52 @@ with tab2:
 # ---------------------------------------------------------------------------
 # Tab 3 : Fournisseurs
 # ---------------------------------------------------------------------------
-with tab3:
-    st.subheader("Comptes Fournisseurs")
-    col1, col2 = st.columns(2)
-    with col1:
-        search_intitule = st.selectbox("🔍 Recherche par nom", options=base_opts["fou_nom"], key="Fournisseurs_nom")
-    with col2:
-        search_ref = st.selectbox("🔍 Recherche par référence", options=base_opts["fou_ref"], key="Fournisseurs_ref")
+if not collab:
+    with tab3:
+        st.subheader("Comptes Fournisseurs")
+        col1, col2 = st.columns(2)
+        with col1:
+            search_intitule = st.selectbox("🔍 Recherche par nom", options=base_opts["fou_nom"], key="Fournisseurs_nom")
+        with col2:
+            search_ref = st.selectbox("🔍 Recherche par référence", options=base_opts["fou_ref"], key="Fournisseurs_ref")
     
-    type_tiers = "Fournisseurs"
+        type_tiers = "Fournisseurs"
 
-    with st.spinner("Chargement..."):
-        df_tiers = search_comptes_tiers(
-            client_schema=client_schema,
-            search_term=search_intitule if search_intitule != "Tout" else "",
-            search_ref=search_ref if search_ref != "Tout" else "",
-            type_filter=type_tiers,
-            limit=limit
-        )
+        with st.spinner("Chargement..."):
+            df_tiers = search_comptes_tiers(
+                client_schema=client_schema,
+                search_term=search_intitule if search_intitule != "Tout" else "",
+                search_ref=search_ref if search_ref != "Tout" else "",
+                type_filter=type_tiers,
+                limit=limit
+            )
     
-    if not df_tiers.empty:
-        st.markdown("*Cliquez sur un fournisseur pour voir ses statistiques.*")
-        selection_fou = show_df(df_tiers, on_select="rerun", selection_mode="single-row", key_suffix="Fournisseurs")
-        render_tiers_detail(df_tiers, selection_fou, 1, "stat_fou")
-    else:
-        st.info("Aucun compte Fournisseurs trouvé.")
+        if not df_tiers.empty:
+            st.markdown("*Cliquez sur un fournisseur pour voir ses statistiques.*")
+            selection_fou = show_df(df_tiers, on_select="rerun", selection_mode="single-row", key_suffix="Fournisseurs")
+            render_tiers_detail(df_tiers, selection_fou, 1, "stat_fou")
+        else:
+            st.info("Aucun compte Fournisseurs trouvé.")
+else:
+    with tab3:
+        section_interdite()
 
 # ---------------------------------------------------------------------------
 # Tab 4 : Dépôts
 # ---------------------------------------------------------------------------
-with tab4:
-    st.subheader("Dépôts de Stock")
-    with st.spinner("Chargement des dépôts..."):
-        df_depots = get_depots_summary(client_schema)
+if not collab:
+    with tab4:
+        st.subheader("Dépôts de Stock")
+        with st.spinner("Chargement des dépôts..."):
+            df_depots = get_depots_summary(client_schema)
     
-    if not df_depots.empty:
-        show_df(df_depots, key_suffix="depots")
-    else:
-        st.info("Aucun dépôt trouvé.")
+        if not df_depots.empty:
+            show_df(df_depots, key_suffix="depots")
+        else:
+            st.info("Aucun dépôt trouvé.")
+else:
+    with tab4:
+        section_interdite()
 
 # ---------------------------------------------------------------------------
 # Tab 5 : Familles

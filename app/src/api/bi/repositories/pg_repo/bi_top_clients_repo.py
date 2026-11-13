@@ -7,7 +7,7 @@ from typing import Tuple, List, Dict, Any
 
 from api.bi.repositories.base_bi_repo import BaseBIRepository
 from api.bi.repositories.pg_repo._executor import execute_query
-from api.bi.repositories.pg_repo.sql_helpers import validate_schema, add_date_range
+from api.bi.repositories.pg_repo.sql_helpers import validate_schema, add_date_range, add_in
 
 
 class PgBITopClientsRepository(BaseBIRepository):
@@ -44,5 +44,6 @@ LEFT JOIN {schema}.f_comptet ct ON ct.ct_num = e.do_tiers
 WHERE e.do_domaine = 0 AND e.do_type IN (6, 7)""".strip()
 
         sql = add_date_range(sql, "e.do_date", req.date_from, req.date_to, params)
+        sql = add_in(sql, "COALESCE(e.co_no, 0)", getattr(req, "co_no", []), params)
 
         return sql, params, col_aliases

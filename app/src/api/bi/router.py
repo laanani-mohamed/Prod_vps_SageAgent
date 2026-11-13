@@ -11,7 +11,7 @@ Routes :
 import logging
 from fastapi import APIRouter, HTTPException, Query, Depends, Request
 
-from api.auth.dependencies import require_role
+from api.auth.dependencies import DIRECTEUR_OU_COLLABORATEUR, DIRECTEUR_SEUL
 from api.auth.schemas import TokenData
 from api._base_router import secured_handle
 
@@ -53,7 +53,7 @@ Agrège les données depuis les archives pour produire les 4 KPIs du tableau de 
 def dashboard(
     req: DashboardRequest,
     request: Request,
-    current_user: TokenData = Depends(require_role("analyst"))
+    current_user: TokenData = Depends(DIRECTEUR_OU_COLLABORATEUR)
 ) -> DashboardResponse:
     return secured_handle(
         get_dashboard,
@@ -73,10 +73,11 @@ def dashboard(
 def dashboard_last_update(
     request: Request,
     client_schema: str = Query(..., description="Schéma client"),
-    current_user: TokenData = Depends(require_role("analyst"))
+    current_user: TokenData = Depends(DIRECTEUR_OU_COLLABORATEUR)
 ) -> LastUpdateResponse:
     return secured_handle(
         get_last_update,
+        partage=True,
         endpoint="/api/bi/dashboard/last-update",
         request=request,
         current_user=current_user,
@@ -92,7 +93,7 @@ def dashboard_last_update(
 def dashboard_objectifs(
     request: Request,
     client_schema: str = Query(..., description="Schéma client"),
-    current_user: TokenData = Depends(require_role("analyst"))
+    current_user: TokenData = Depends(DIRECTEUR_SEUL)
 ) -> ObjectifsResponse:
     return secured_handle(
         get_objectifs,
@@ -113,7 +114,7 @@ def dashboard_analytique(
     client_schema: str = Query(..., description="Schéma client"),
     date_from: str = Query(..., description="Date début YYYY-MM-DD"),
     date_to: str = Query(..., description="Date fin YYYY-MM-DD"),
-    current_user: TokenData = Depends(require_role("analyst"))
+    current_user: TokenData = Depends(DIRECTEUR_OU_COLLABORATEUR)
 ) -> KpiAnalytiqueResponse:
     return secured_handle(
         get_analytique,
@@ -137,7 +138,7 @@ def dashboard_analytique(
 def rapport_ca(
     req: RapportCARequest,
     request: Request,
-    current_user: TokenData = Depends(require_role("analyst"))
+    current_user: TokenData = Depends(DIRECTEUR_OU_COLLABORATEUR)
 ) -> RapportResponse:
     return secured_handle(
         get_rapport_ca,
@@ -157,7 +158,7 @@ def rapport_ca(
 def top_clients(
     req: TopClientsRequest,
     request: Request,
-    current_user: TokenData = Depends(require_role("analyst"))
+    current_user: TokenData = Depends(DIRECTEUR_OU_COLLABORATEUR)
 ) -> RapportResponse:
     return secured_handle(
         get_top_clients,
@@ -177,7 +178,7 @@ def top_clients(
 def top_articles(
     req: TopArticlesRequest,
     request: Request,
-    current_user: TokenData = Depends(require_role("analyst"))
+    current_user: TokenData = Depends(DIRECTEUR_OU_COLLABORATEUR)
 ) -> RapportResponse:
     return secured_handle(
         get_top_articles,
@@ -197,7 +198,7 @@ def top_articles(
 def rapport_balance(
     req: BalanceClientRequest,
     request: Request,
-    current_user: TokenData = Depends(require_role("analyst"))
+    current_user: TokenData = Depends(DIRECTEUR_OU_COLLABORATEUR)
 ) -> RapportResponse:
     return secured_handle(
         get_balance_client,
@@ -217,7 +218,7 @@ def rapport_balance(
 def rapport_visite_client(
     req: RapportVisiteClientRequest,
     request: Request,
-    current_user: TokenData = Depends(require_role("analyst"))
+    current_user: TokenData = Depends(DIRECTEUR_OU_COLLABORATEUR)
 ) -> RapportResponse:
     return secured_handle(
         get_rapport_visite,
@@ -237,7 +238,7 @@ def rapport_visite_client(
 def rapport_valeur_stock(
     req: ValeurStockRequest,
     request: Request,
-    current_user: TokenData = Depends(require_role("analyst"))
+    current_user: TokenData = Depends(DIRECTEUR_SEUL)
 ) -> RapportResponse:
     return secured_handle(
         get_valeur_stock,
@@ -257,7 +258,7 @@ def rapport_valeur_stock(
 def rapport_balance_agee(
     req: BalanceClientRequest,
     request: Request,
-    current_user: TokenData = Depends(require_role("analyst"))
+    current_user: TokenData = Depends(DIRECTEUR_OU_COLLABORATEUR)
 ) -> RapportResponse:
     return secured_handle(
         get_balance_agee,
@@ -277,7 +278,7 @@ def rapport_balance_agee(
 def rapport_consommation(
     req: RapportConsommationRequest,
     request: Request,
-    current_user: TokenData = Depends(require_role("analyst"))
+    current_user: TokenData = Depends(DIRECTEUR_SEUL)
 ) -> RapportResponse:
     return secured_handle(
         get_rapport_consommation,
@@ -297,7 +298,7 @@ def rapport_consommation(
 def stats_tiers(
     req: StatsTiersRequest,
     request: Request,
-    current_user: TokenData = Depends(require_role("analyst"))
+    current_user: TokenData = Depends(DIRECTEUR_OU_COLLABORATEUR)
 ) -> RapportResponse:
     return secured_handle(
         get_stats_tiers,

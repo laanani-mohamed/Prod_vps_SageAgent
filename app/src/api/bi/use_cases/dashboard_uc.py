@@ -57,6 +57,14 @@ def execute(req: DashboardRequest) -> DashboardResponse:
                     (kpis.chiffre_affaires - kpis.ca_n_minus_1) / kpis.ca_n_minus_1 * 100, 1
                 )
 
+    # Vue d'un commercial (collaborateur) : achats, dettes fournisseurs et stock ne sont pas renvoyés
+    if req.co_no:
+        kpis.total_achats = kpis.dettes_fournisseurs = kpis.valeur_stock = None
+        return DashboardResponse(
+            client_schema=req.client_schema, source=req.source_type,
+            date_from=req.date_from, date_to=req.date_to, kpis=kpis,
+        )
+
     # Valorisation du stock : Σ AS_MontSto (montant du stock Sage), vide → 0
     try:
         stock_rows = repo.fetch_stock(req)

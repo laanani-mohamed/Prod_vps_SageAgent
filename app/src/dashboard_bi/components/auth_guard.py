@@ -29,6 +29,33 @@ def require_auth():
         st.stop()
 
 
+def est_collaborateur() -> bool:
+    """Profil collaborateur (rôle lu dans le jeton à la connexion, voir app.py).
+    Sert uniquement à l'affichage : l'API impose elle-même le périmètre du collaborateur."""
+    return "collaborateur" in st.session_state.get("roles", [])
+
+
+INTERDIT = "🚫"
+MSG_INTERDIT = "Vous n'avez pas les droits nécessaires pour consulter cette section."
+
+
+def libelle(label: str, autorise: bool) -> str:
+    """Libellé d'onglet ou de section, précédé de 🚫 si le profil n'y a pas accès."""
+    return label if autorise else f"{INTERDIT} {label}"
+
+
+def section_interdite():
+    """Contenu affiché à la place d'une section non autorisée pour le profil."""
+    st.warning(MSG_INTERDIT, icon=INTERDIT)
+
+
+def require_directeur():
+    """Arrête la page si l'utilisateur n'a pas le profil directeur."""
+    if est_collaborateur():
+        section_interdite()
+        st.stop()
+
+
 def handle_auth_error(e: Exception):
     """
     À appeler dans les blocs except des pages Streamlit.

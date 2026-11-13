@@ -4,7 +4,7 @@ api/transactions/router.py — Routeur FastAPI pour le module Transactions.
 import logging
 from fastapi import APIRouter, HTTPException, Request, Depends
 
-from api.auth.dependencies import require_role
+from api.auth.dependencies import DIRECTEUR_OU_COLLABORATEUR, DIRECTEUR_SEUL
 from api.auth.schemas import TokenData
 from api._base_router import secured_handle
 
@@ -18,7 +18,7 @@ router = APIRouter(prefix="/api/transactions", tags=["Transactions"])
 def get_ventes(
     req: TransactionsRequest,
     r: Request,
-    current_user: TokenData = Depends(require_role("analyst"))
+    current_user: TokenData = Depends(DIRECTEUR_OU_COLLABORATEUR)
 ):
     # Forcer le domaine vente (0) s'il n'est pas spécifié, ou s'assurer qu'il est inclus
     if 0 not in req.filters.do_domaine:
@@ -36,7 +36,7 @@ def get_ventes(
 def get_achats(
     req: TransactionsRequest,
     r: Request,
-    current_user: TokenData = Depends(require_role("analyst"))
+    current_user: TokenData = Depends(DIRECTEUR_SEUL)
 ):
     # Forcer le domaine achat (1) s'il n'est pas spécifié, ou s'assurer qu'il est inclus
     if 1 not in req.filters.do_domaine:
@@ -54,7 +54,7 @@ def get_achats(
 def get_documents(
     req: TransactionsRequest,
     r: Request,
-    current_user: TokenData = Depends(require_role("analyst"))
+    current_user: TokenData = Depends(DIRECTEUR_SEUL)
 ):
     return secured_handle(
         get_transactions,

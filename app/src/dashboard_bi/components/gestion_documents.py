@@ -6,11 +6,12 @@ mêmes filtres et mêmes onglets par type de document, seuls le domaine
 (0=Ventes, 1=Achats) et les libellés changent.
 """
 import streamlit as st
+from utils.cache import cache_data   # cache par périmètre (schéma, rôle, co_no)
 import pandas as pd
 
 from components.data_tables import show_df
 from components.date_filters import date_range_filter
-from components.auth_guard import handle_auth_error
+from components.auth_guard import handle_auth_error, est_collaborateur
 from services.documents_service import get_documents_entete, get_documents_ligne, get_formatted_documents, commercial_label
 
 
@@ -40,8 +41,8 @@ def render_gestion_documents_page(
     tab_configs    : liste de `category` (une par onglet, même ordre que tab_labels)
     """
     with st.expander("🔍 Filtres de recherche", expanded=True):
-        @st.cache_data(ttl=300, show_spinner=False)
-        def fetch_filter_options(schema):
+        @cache_data(ttl=300, show_spinner=False)
+        def fetch_filter_options(schema, domaine):   # domaine dans la clé de cache (Ventes ≠ Achats)
             empty = (["Tout"], ["Tout"], ["Tout"], {}, None, None)
             if not schema:
                 return empty
@@ -77,7 +78,7 @@ def render_gestion_documents_page(
             except Exception:
                 return empty
 
-        pieces_opts, tiers_opts, intitule_opts, commerciaux, date_min, date_max = fetch_filter_options(client_schema)
+        pieces_opts, tiers_opts, intitule_opts, commerciaux, date_min, date_max = fetch_filter_options(client_schema, domaine)
 
         col1, col2, col3, col4 = st.columns(4)
         with col1:
@@ -87,11 +88,13 @@ def render_gestion_documents_page(
         with col3:
             search_intitule = st.selectbox(intitule_label, options=intitule_opts, help=f"Filtre sur le nom du {tiers_logical}", key=f"intitule_{key_ns}")
         with col4:
+            collab = est_collaborateur()   # liste figée sur son nom : l'API ne renvoie que ses documents
             search_commercial = st.selectbox(
                 "Commercial",
-                options=["Tout"] + sorted(commerciaux),
+                options=(sorted(commerciaux) or ["N/A"]) if collab else ["Tout"] + sorted(commerciaux),
                 help="Commercial (collaborateur) porté par le document",
-                key=f"commercial_{key_ns}",
+                key=f"commercial_{key_ns}" + ("_collab" if collab else ""),
+                disabled=collab,
             )
 
         col5, col6, col7 = st.columns([1, 1, 2])

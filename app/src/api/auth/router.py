@@ -8,6 +8,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordRequestForm
 import psycopg2
+from psycopg2 import sql
 from psycopg2.extras import RealDictCursor
 
 from .schemas import Token, RefreshTokenRequest, UserInDB
@@ -28,6 +29,26 @@ def get_user(conn, username: str) -> Optional[UserInDB]:
         row = cur.fetchone()
         if row:
             return UserInDB(**row)
+    return None
+
+
+def profil_invalide(conn, user: UserInDB) -> Optional[str]:
+    """Motif de refus si le profil n'est ni directeur ni un collaborateur rattaché à un
+    F_COLLABORATEUR existant de son schéma ; None si le profil est valide."""
+    if user.roles == ["directeur"]:
+        return None
+    if user.roles != ["collaborateur"]:
+        return f"Profil inconnu {user.roles}"
+    if not user.co_no or len(user.allowed_schemas) != 1:
+        return "Collaborateur sans co_no ou avec plusieurs schémas"
+    with conn.cursor() as cur:
+        cur.execute(
+            sql.SQL("SELECT 1 FROM {}.f_collaborateur WHERE co_no = %s").format(
+                sql.Identifier(user.allowed_schemas[0].lower())),
+            (user.co_no,),
+        )
+        if cur.fetchone() is None:
+            return f"co_no {user.co_no} absent de F_COLLABORATEUR"
     return None
 
 @router.post("/token", response_model=Token)
@@ -55,6 +76,11 @@ def login_for_access_token(
     if not user.is_active:
         log_audit_event("LOGIN", "/api/auth/token", ip_address, "FAILED", username=form_data.username, details="Compte inactif")
         raise HTTPException(status_code=400, detail="Compte inactif")
+
+    motif = profil_invalide(conn, user)
+    if motif:
+        log_audit_event("LOGIN", "/api/auth/token", ip_address, "FAILED", username=form_data.username, details=motif)
+        raise HTTPException(status_code=403, detail="Profil non autorisé. Contactez un administrateur.")
 
     access_token = create_access_token(user)
     refresh_token = create_refresh_token(user)
@@ -122,6 +148,10 @@ def refresh_access_token(
     user = get_user(conn, username)
     if not user or not user.is_active:
         raise HTTPException(status_code=401, detail="Utilisateur introuvable ou inactif")
+    motif = profil_invalide(conn, user)
+    if motif:
+        log_audit_event("REFRESH", "/api/auth/refresh", ip_address, "FAILED", username=username, details=motif)
+        raise HTTPException(status_code=401, detail="Profil non autorisé. Veuillez vous reconnecter.")
 
     # 4. Émettre de nouveaux tokens
     access_token = create_access_token(user)

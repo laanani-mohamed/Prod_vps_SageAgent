@@ -446,6 +446,7 @@ class ReglementRequest(BaseReferentielRequest):
     rg_typereg: List[int] = Field(default_factory=list, description="Type règlement : 0 à 8")
     date_from: Optional[str] = Field(None, description="Date document >= YYYY-MM-DD")
     date_to: Optional[str] = Field(None, description="Date document <= YYYY-MM-DD")
+    co_no: List[int] = Field(default_factory=list, description="Commercial de l'entête (CO_No) — vide = tous")
 
 
 class DateRangeRequest(BaseReferentielRequest):

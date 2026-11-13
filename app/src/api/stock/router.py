@@ -15,7 +15,7 @@ Route utilitaire :
 import logging
 from fastapi import APIRouter, HTTPException, Request, Depends
 
-from api.auth.dependencies import require_role
+from api.auth.dependencies import DIRECTEUR_SEUL
 from api.auth.schemas import TokenData
 from api._base_router import secured_handle
 
@@ -53,7 +53,7 @@ def health():
 def get_stock_availability(
     req: CheckAvailabilityRequest,
     r: Request,
-    current_user: TokenData = Depends(require_role("analyst"))
+    current_user: TokenData = Depends(DIRECTEUR_SEUL)
 ) -> StockResponse:
     return secured_handle(
         get_specific,
@@ -74,7 +74,7 @@ def get_stock_availability(
 def get_article_details(
     req: ArticleDetailsRequest,
     r: Request,
-    current_user: TokenData = Depends(require_role("analyst"))
+    current_user: TokenData = Depends(DIRECTEUR_SEUL)
 ) -> StockResponse:
     return secured_handle(
         get_specific,
@@ -95,7 +95,7 @@ def get_article_details(
 def get_catalog_search(
     req: CatalogSearchRequest,
     r: Request,
-    current_user: TokenData = Depends(require_role("analyst"))
+    current_user: TokenData = Depends(DIRECTEUR_SEUL)
 ) -> StockResponse:
     return secured_handle(
         get_specific,
@@ -116,7 +116,7 @@ def get_catalog_search(
 def get_stock_insights(
     req: StockInsightRequest,
     r: Request,
-    current_user: TokenData = Depends(require_role("analyst"))
+    current_user: TokenData = Depends(DIRECTEUR_SEUL)
 ) -> StockResponse:
     return secured_handle(
         get_specific,
@@ -137,7 +137,7 @@ def get_stock_insights(
 def get_stock_snapshot(
     req: StockSnapshotRequest,
     r: Request,
-    current_user: TokenData = Depends(require_role("analyst"))
+    current_user: TokenData = Depends(DIRECTEUR_SEUL)
 ) -> StockResponse:
     return secured_handle(
         get_specific,
@@ -158,7 +158,7 @@ def get_stock_snapshot(
 def compare_stock_time(
     req: StockCompareTimeRequest,
     r: Request,
-    current_user: TokenData = Depends(require_role("analyst"))
+    current_user: TokenData = Depends(DIRECTEUR_SEUL)
 ) -> StockResponse:
     return secured_handle(
         get_specific,

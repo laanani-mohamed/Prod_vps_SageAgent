@@ -44,3 +44,9 @@ def require_role(*required_roles: str):
             )
         return current_user
     return _check
+
+
+# Qui peut appeler un endpoint (un utilisateur n'a qu'UN rôle, contrainte CHECK sur auth.users).
+# Le filtre sur le co_no du collaborateur est imposé ensuite par secured_handle.
+DIRECTEUR_OU_COLLABORATEUR = require_role("directeur", "collaborateur")
+DIRECTEUR_SEUL = require_role("directeur")

@@ -55,10 +55,10 @@ def get_objectifs(client_schema: str) -> ObjectifsResponse:
     return objectifs_uc.execute(client_schema)
 
 
-def get_analytique(client_schema: str, date_from: str, date_to: str) -> KpiAnalytiqueResponse:
+def get_analytique(client_schema: str, date_from: str, date_to: str, co_no: list = None) -> KpiAnalytiqueResponse:
     """KPIs analytiques avancés (Marge, DSO, Litige, Retour, Conversion, Top Clients)."""
     logger.info("[BI] analytique | schema=%s | %s → %s", client_schema, date_from, date_to)
-    return analytique_uc.execute(client_schema, date_from, date_to)
+    return analytique_uc.execute(client_schema, date_from, date_to, co_no)
 
 
 def get_rapport_ca(req: RapportCARequest) -> RapportResponse:

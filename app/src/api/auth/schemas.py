@@ -31,6 +31,7 @@ class UserInDB(UserBase):
     id: int
     hashed_password: str
     is_active: bool
+    co_no: Optional[int] = None   # F_COLLABORATEUR.co_no du profil collaborateur (NULL pour un directeur)
 
 class UserResponse(UserBase):
     id: int
@@ -46,6 +47,7 @@ class TokenData(BaseModel):
     username: str
     roles: List[str]
     allowed_schemas: List[str]
+    co_no: Optional[int] = None
 
 class RefreshTokenRequest(BaseModel):
     refresh_token: str

@@ -4,11 +4,12 @@ Page 4 — Gestion des Achats
 """
 import streamlit as st
 from components.styles_initiale import apply_custom_css
-from components.auth_guard import require_auth, require_api_health
+from components.auth_guard import require_auth, require_api_health, require_directeur
 from components.gestion_documents import render_gestion_documents_page
 
 apply_custom_css()
 require_auth()
+require_directeur()
 
 st.header("Gestion des Achats")
 

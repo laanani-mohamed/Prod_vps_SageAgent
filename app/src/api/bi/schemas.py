@@ -11,6 +11,10 @@ import re
 # Requête commune
 # ---------------------------------------------------------------------------
 
+CO_NO_DESC = ("Filtre commercial (F_DOCENTETE.co_no) — 0 = Non identifié ; vide = tous. "
+              "Pour un collaborateur, imposé par le jeton (la valeur envoyée est ignorée).")
+
+
 class BaseBIRequest(BaseModel):
     client_schema: str = Field(..., description="Schéma PostgreSQL du client")
     source_type: str = Field("db_latest", description="'db_latest' ou 'archive'")
@@ -34,6 +38,7 @@ class BaseBIRequest(BaseModel):
 class DashboardRequest(BaseBIRequest):
     date_from: Optional[str] = Field(None, description="Date début YYYY-MM-DD")
     date_to: Optional[str] = Field(None, description="Date fin YYYY-MM-DD")
+    co_no: List[int] = Field(default_factory=list, description=CO_NO_DESC)
 
 
 class LastUpdateResponse(BaseModel):
@@ -47,10 +52,11 @@ class KPIData(BaseModel):
     chiffre_affaires: float = 0.0
     ca_n_minus_1: float = 0.0
     ca_evolution_pct: Optional[float] = None   # None si CA N-1 ≤ 0 (évolution non calculable)
-    total_achats: float = 0.0
-    valeur_stock: float = 0.0
+    # None quand la vue est limitée à un commercial (co_no) : achats et stock n'ont pas de commercial
+    total_achats: Optional[float] = 0.0
+    valeur_stock: Optional[float] = 0.0
     encours_clients: float = 0.0
-    dettes_fournisseurs: float = 0.0
+    dettes_fournisseurs: Optional[float] = 0.0
     nb_clients_actifs: int = 0
     ca_evolution_monthly: List[dict] = Field(default_factory=list)
 
@@ -91,6 +97,7 @@ class RapportCARequest(BaseBIRequest):
     date_to: Optional[str] = None
     group_by: str = Field("mois", description="'mois' | 'client' | 'commercial' | 'region'")
     limit: int = Field(100000000, ge=1)
+    co_no: List[int] = Field(default_factory=list, description=CO_NO_DESC)
 
 
 class BalanceClientRequest(BaseBIRequest):
@@ -105,6 +112,7 @@ class RapportVisiteClientRequest(BaseBIRequest):
     do_tiers: str = Field(..., description="Code client (do_tiers / ct_num)")
     date_from: Optional[str] = Field(None, description="Date début (YYYY-MM-DD) — défaut : J-180")
     date_to:   Optional[str] = Field(None, description="Date fin (YYYY-MM-DD) — défaut : aujourd'hui")
+    co_no: List[int] = Field(default_factory=list, description=CO_NO_DESC)
 
 
 class StatsTiersRequest(BaseBIRequest):
@@ -113,6 +121,7 @@ class StatsTiersRequest(BaseBIRequest):
     ct_type: int = Field(..., description="0 = client, 1 = fournisseur")
     date_from: str = Field(..., description="Date début YYYY-MM-DD")
     date_to: str = Field(..., description="Date fin YYYY-MM-DD")
+    co_no: List[int] = Field(default_factory=list, description=CO_NO_DESC)
 
     @field_validator("ct_type")
     @classmethod
@@ -137,6 +146,7 @@ class TopClientsRequest(BaseBIRequest):
     date_from: Optional[str] = None
     date_to: Optional[str] = None
     limit: int = Field(100000000, ge=1)
+    co_no: List[int] = Field(default_factory=list, description=CO_NO_DESC)
 
 
 class TopArticlesRequest(BaseBIRequest):
@@ -144,6 +154,7 @@ class TopArticlesRequest(BaseBIRequest):
     date_to: Optional[str] = None
     limit: int = Field(100000000, ge=1)
     fa_codefamille: List[str] = Field(default_factory=list)
+    co_no: List[int] = Field(default_factory=list, description=CO_NO_DESC)
 
 
 class RapportResponse(BaseModel):

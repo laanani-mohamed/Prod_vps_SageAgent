@@ -23,7 +23,7 @@ Route utilitaire :
 import logging
 from fastapi import APIRouter, HTTPException, Request, Depends
 
-from api.auth.dependencies import require_role
+from api.auth.dependencies import DIRECTEUR_OU_COLLABORATEUR, DIRECTEUR_SEUL
 from api.auth.schemas import TokenData
 from api._base_router import secured_handle
 
@@ -63,10 +63,11 @@ Recherche complète dans **F_COMPTET** avec tous les filtres disponibles.
 def get_comptes_tiers(
     req: ComptesTiersRequest,
     r: Request,
-    current_user: TokenData = Depends(require_role("analyst"))
+    current_user: TokenData = Depends(DIRECTEUR_OU_COLLABORATEUR)
 ) -> ReferentielResponse:
     return secured_handle(
         get_specific,
+        partage=True,
         endpoint="/api/referentiel/comptes-tiers",
         request=r,
         current_user=current_user,
@@ -94,10 +95,11 @@ Recherche dans **F_COLLABORATEUR** avec filtres métier.
 def get_collaborateurs(
     req: CollaborateurRequest,
     r: Request,
-    current_user: TokenData = Depends(require_role("analyst"))
+    current_user: TokenData = Depends(DIRECTEUR_OU_COLLABORATEUR)
 ) -> ReferentielResponse:
     return secured_handle(
         get_specific,
+        partage=True,
         endpoint="/api/referentiel/collaborateurs",
         request=r,
         current_user=current_user,
@@ -126,10 +128,11 @@ Recherche dans **F_ARTICLE** avec options d'enrichissement stock et lots.
 def get_articles_detail(
     req: ArticleDetailRequest,
     r: Request,
-    current_user: TokenData = Depends(require_role("analyst"))
+    current_user: TokenData = Depends(DIRECTEUR_OU_COLLABORATEUR)
 ) -> ReferentielResponse:
     return secured_handle(
         get_specific,
+        partage=True,
         endpoint="/api/referentiel/articles/detail",
         request=r,
         current_user=current_user,
@@ -156,10 +159,11 @@ Accès direct à **F_FAMILLE** avec arborescence centralisatrice.
 def get_familles(
     req: FamilleRequest,
     r: Request,
-    current_user: TokenData = Depends(require_role("analyst"))
+    current_user: TokenData = Depends(DIRECTEUR_OU_COLLABORATEUR)
 ) -> ReferentielResponse:
     return secured_handle(
         get_specific,
+        partage=True,
         endpoint="/api/referentiel/familles",
         request=r,
         current_user=current_user,
@@ -189,7 +193,7 @@ Colonne calculée : `jours_avant_peremption` (négatif = déjà périmé)
 def get_lots_series(
     req: LotSerieRequest,
     r: Request,
-    current_user: TokenData = Depends(require_role("analyst"))
+    current_user: TokenData = Depends(DIRECTEUR_SEUL)
 ) -> ReferentielResponse:
     return secured_handle(
         get_specific,
@@ -221,7 +225,7 @@ Colonne calculée : `reste_a_payer = DO_TotalTTC - DO_MontantRegle`
 def get_documents_entete(
     req: DocEnteteRequest,
     r: Request,
-    current_user: TokenData = Depends(require_role("analyst"))
+    current_user: TokenData = Depends(DIRECTEUR_OU_COLLABORATEUR)
 ) -> ReferentielResponse:
     return secured_handle(
         get_specific,
@@ -253,7 +257,7 @@ Recherche dans **F_DOCLIGNE** (niveau ligne). Option `with_entete` pour afficher
 def get_documents_ligne(
     req: DocLigneRequest,
     r: Request,
-    current_user: TokenData = Depends(require_role("analyst"))
+    current_user: TokenData = Depends(DIRECTEUR_OU_COLLABORATEUR)
 ) -> ReferentielResponse:
     return secured_handle(
         get_specific,
@@ -286,7 +290,7 @@ Colonnes calculées : `valeur_stock_achat` (= AS_MontSto, montant du stock Sage)
 def get_stock_depot(
     req: StockDepotRequest,
     r: Request,
-    current_user: TokenData = Depends(require_role("analyst"))
+    current_user: TokenData = Depends(DIRECTEUR_SEUL)
 ) -> ReferentielResponse:
     return secured_handle(
         get_specific,
@@ -309,7 +313,7 @@ Recherche dans **F_REGLECH** avec jointure sur F_DOCENTETE et F_COMPTET pour les
 def get_reglements(
     req: ReglementRequest,
     r: Request,
-    current_user: TokenData = Depends(require_role("analyst"))
+    current_user: TokenData = Depends(DIRECTEUR_OU_COLLABORATEUR)
 ) -> ReferentielResponse:
     return secured_handle(
         get_specific,
@@ -335,10 +339,11 @@ Retourne une seule ligne `{date_min, date_max}` (YYYY-MM-DD) calculée sur `do_d
 def get_date_range(
     req: DateRangeRequest,
     r: Request,
-    current_user: TokenData = Depends(require_role("analyst"))
+    current_user: TokenData = Depends(DIRECTEUR_OU_COLLABORATEUR)
 ) -> ReferentielResponse:
     return secured_handle(
         get_specific,
+        partage=True,
         endpoint="/api/referentiel/date-range",
         request=r,
         current_user=current_user,

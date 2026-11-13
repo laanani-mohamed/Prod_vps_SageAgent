@@ -9,10 +9,11 @@ import datetime
 from components.styles_initiale import apply_custom_css
 from components.data_tables import show_df
 from components.date_filters import date_range_filter
-from components.auth_guard import require_auth, handle_auth_error, require_api_health
+from components.auth_guard import require_auth, handle_auth_error, require_api_health, require_directeur
 
 apply_custom_css()
 require_auth()
+require_directeur()
 
 from services.stock_service import get_stock_availability, get_stock_insights, get_mouvements_entrants, get_mouvements_sortants
 from services.documents_service import get_date_bounds

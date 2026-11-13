@@ -7,12 +7,13 @@ import datetime
 from typing import Optional
 import pandas as pd
 import streamlit as st
+from utils.cache import cache_data   # cache par périmètre (schéma, rôle, co_no)
 
 from services.base import call_api
 from config import SOURCE_TYPE
 
 
-@st.cache_data(ttl=300, show_spinner=False)
+@cache_data(ttl=300, show_spinner=False)
 def get_date_bounds(
     client_schema: str,
     table: str = "docentete",

@@ -754,11 +754,13 @@ Constatés à la lecture du code. À traiter avant ou pendant la reprise du proj
 
 ### Ajouter un nouveau client
 
-1. **Dashboard Ops → Onboarding client** : crée le compte SFTP, l'utilisateur API (rôle `analyst`,
-   schéma du client) et l'entrée dans `auth.json` avec un port.
-   En ligne de commande, l'équivalent est `sftp_onboard.sh` + `utils/auth/create_user.py`.
-2. Créer le schéma PostgreSQL `<client>` avec les 11 tables (même structure que les clients
-   existants, colonne `as_montsto` comprise).
+1. **Dashboard Ops → Onboarding → « Créer le schéma d'un client »** : crée le schéma PostgreSQL
+   `<client>` et ses 11 tables vides (`utils/migrations/create_client_schema.sql`, en une transaction ;
+   la cause est affichée en cas d'erreur). En ligne de commande : voir l'en-tête du fichier SQL.
+2. **Dashboard Ops → Onboarding → « Ajouter un nouveau client »** : crée le compte SFTP, l'utilisateur
+   API (profil `directeur`, ou `collaborateur` avec son identifiant `co_no` Sage) et l'entrée dans
+   `auth.json` avec un port. En ligne de commande, l'équivalent est `sftp_onboard.sh` +
+   `utils/auth/create_user.py`.
 3. Dashboard dédié : copier `service/clients/<client>.env` (`PORT=…`) dans
    `/etc/sageagent/clients/`, puis `sudo systemctl enable --now sageagent-dashbi@<client>`.
 4. nginx : ajouter la ligne `<client>.sageagent.test <port>;` dans `sageagent_clients.conf`,

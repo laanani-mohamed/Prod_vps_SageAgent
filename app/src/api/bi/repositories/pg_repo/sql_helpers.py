@@ -26,6 +26,13 @@ def add_in(sql: str, column: str, values: list, params: list) -> str:
     return sql + f" AND {column} IN ({placeholders})"
 
 
+def co_no_filter(co_no: list) -> str:
+    """AND sur le commercial de l'entête (alias e, F_DOCENTETE.co_no, 0 = Non identifié) ; liste vide = tous.
+    Valeurs converties en int : insérables sans paramètre, pour les requêtes où la condition
+    ne peut pas être ajoutée en fin de SQL (ORDER BY / GROUP BY, paramètres positionnels)."""
+    return f" AND COALESCE(e.co_no, 0) IN ({', '.join(str(int(v)) for v in co_no)})" if co_no else ""
+
+
 def add_eq(sql: str, column: str, value, params: list) -> str:
     """Ajoute AND column = %s si value non None."""
     if value is None:
