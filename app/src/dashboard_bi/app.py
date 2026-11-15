@@ -234,6 +234,3 @@ else:
     st.session_state.rapport_actif = int(pg.url_path.split("_")[1]) if pg.url_path.startswith("rapport_") else None
     pg.run()
 
-
-revenant au onboarding je veux creer 2 partie une pour les client avec les meme infos on suprimant identifiant collaborateur 
-et un autre champ pour creer profil on va laisser nom du client login shema port profil identifiant
