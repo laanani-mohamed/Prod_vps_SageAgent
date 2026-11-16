@@ -142,6 +142,16 @@ class RapportConsommationRequest(BaseBIRequest):
     date_to:   Optional[str] = Field(None, description="Calculé automatiquement (aujourd'hui) si absent")
 
 
+class RapportRequest(BaseBIRequest):
+    """Rapport de l'onglet Rapports, mis en forme comme dans le dashboard (POST /api/bi/rapports/{nom})."""
+    filtres: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Filtres du rapport, mêmes clés que config/rapports_config.py — "
+                    "ex : {\"group_by\": \"client\", \"date_from\": \"2026-01-01\", \"date_to\": \"2026-11-16\"}",
+    )
+    co_no: List[int] = Field(default_factory=list, description=CO_NO_DESC)
+
+
 class TopClientsRequest(BaseBIRequest):
     date_from: Optional[str] = None
     date_to: Optional[str] = None

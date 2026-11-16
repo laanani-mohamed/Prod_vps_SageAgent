@@ -7,10 +7,14 @@ Routes :
   POST /api/bi/rapport/ca            → Rapport Chiffre d'Affaires
   POST /api/bi/top-clients           → Top N clients par CA
   POST /api/bi/top-articles          → Top N articles vendus
+  POST /api/bi/rapports/{nom}        → Rapport mis en forme (JSON) ou export ?format=pdf|xlsx
 """
 import logging
+from typing import Literal
+
 from fastapi import APIRouter, HTTPException, Query, Depends, Request
 
+from api.auth.audit import log_audit_event
 from api.auth.dependencies import DIRECTEUR_OU_COLLABORATEUR, DIRECTEUR_SEUL
 from api.auth.schemas import TokenData
 from api._base_router import secured_handle
@@ -20,14 +24,14 @@ from api.bi.schemas import (
     RapportCARequest, TopClientsRequest, TopArticlesRequest,
     RapportResponse, KpiAnalytiqueResponse, BalanceClientRequest,
     RapportVisiteClientRequest, ValeurStockRequest,
-    RapportConsommationRequest, StatsTiersRequest,
+    RapportConsommationRequest, StatsTiersRequest, RapportRequest,
 )
 from api.bi.service import (
     get_dashboard, get_objectifs, get_analytique,
     get_rapport_ca, get_top_clients, get_top_articles,
     get_balance_client, get_rapport_visite, get_valeur_stock,
     get_rapport_consommation, get_balance_agee, get_last_update,
-    get_stats_tiers,
+    get_stats_tiers, get_rapport,
 )
 
 logger = logging.getLogger("api.bi.router")
@@ -307,4 +311,47 @@ def stats_tiers(
         current_user=current_user,
         client_schema=req.client_schema,
         req=req
+    )
+
+
+# Rapports de stock : sans commercial, donc non filtrables pour un collaborateur
+RAPPORTS_DIRECTEUR = {"valeur_stock", "produits_dormants", "lots_peremption", "consommation"}
+
+
+@router.post(
+    "/rapports/{nom}",
+    summary="Rapport mis en forme (JSON), ou son export PDF / Excel",
+    description="""
+Les 9 rapports de l'onglet Rapports, calculés par `reporting/` comme pour la tâche planifiée :
+`chiffre_affaire`, `comparaison_ca`, `balance`, `balance_agee`, `valeur_stock`, `visite_client`,
+`produits_dormants`, `lots_peremption`, `consommation`.
+
+- `format=json` (défaut) : `titre`, `sous_titre`, `filtres` appliqués, `sections` (`titre`, `colonnes`, `lignes`),
+  `totaux` (ligne Total) et `repartition` (graphique : valeur par dépôt, ancienneté des dormants).
+- `format=pdf` / `format=xlsx` : le fichier, identique aux boutons de téléchargement du dashboard.
+- `filtres` : mêmes clés que `config/rapports_config.py` ; filtre inconnu ou invalide → 400.
+- Collaborateur : ses propres chiffres (co_no du jeton) ; rapports de stock → 403.
+    """,
+)
+def rapport(
+    nom: str,
+    req: RapportRequest,
+    request: Request,
+    format: Literal["json", "pdf", "xlsx"] = "json",
+    current_user: TokenData = Depends(DIRECTEUR_OU_COLLABORATEUR)
+):
+    endpoint = f"/api/bi/rapports/{nom}"
+    if nom in RAPPORTS_DIRECTEUR and "collaborateur" in current_user.roles:
+        log_audit_event("ACCESS_DENIED", endpoint, request.client.host if request.client else "unknown", "FAILED",
+                        username=current_user.username, client_schema=req.client_schema, details="Rapport réservé au directeur")
+        raise HTTPException(status_code=403, detail="Rapport réservé au directeur")
+    return secured_handle(
+        get_rapport,
+        endpoint=endpoint,
+        request=request,
+        current_user=current_user,
+        client_schema=req.client_schema,
+        req=req,
+        nom=nom,
+        format=format,
     )

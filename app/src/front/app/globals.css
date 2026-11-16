@@ -1,0 +1,84 @@
+:root {
+  --fond: #fafafa;
+  --carte: #ffffff;
+  --texte: #09090b;
+  --doux: #52525b;
+  --bord: #e4e4e7;
+  --gris: #f4f4f5;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--fond); color: var(--texte); }
+:focus-visible { outline: 2px solid var(--texte); outline-offset: 2px; }
+
+/* ---------- Connexion ---------- */
+.connexion { min-height: 100vh; display: flex; }
+
+.vitrine {
+  width: 48%; max-width: 700px; padding: 56px; overflow: hidden;
+  background: var(--carte); border-right: 1px solid var(--bord);
+  display: flex; flex-direction: column; gap: 18px;
+}
+.marque { display: flex; align-items: center; gap: 12px; font-weight: 800; font-size: 22px; letter-spacing: -0.5px; }
+.logo {
+  width: 40px; height: 40px; border-radius: 10px; background: var(--texte); color: #fff;
+  display: grid; place-items: center; font-size: 16px;
+}
+.pastilles { display: flex; gap: 6px; margin-top: 48px; }
+.pastilles span { width: 22px; height: 6px; border-radius: 999px; }
+.vitrine h2 { margin: 0; max-width: 520px; font-size: 38px; line-height: 1.15; font-weight: 800; letter-spacing: -1px; }
+.vitrine p { margin: 0; max-width: 520px; font-size: 16px; line-height: 1.6; color: var(--doux); }
+.apercu { position: relative; height: 260px; margin-top: 32px; }
+.deco {
+  position: absolute; padding: 18px; border-radius: 14px; background: var(--carte);
+  border: 1px solid var(--bord); box-shadow: 0 18px 40px rgb(9 9 11 / 8%);
+  animation: flotte 6s ease-in-out infinite;
+}
+.barres { left: 0; top: 0; width: 300px; height: 130px; display: flex; align-items: flex-end; gap: 8px; }
+.barres span { flex: 1; border-radius: 4px 4px 0 0; }
+.lignes { left: 120px; top: 150px; width: 360px; display: flex; flex-direction: column; gap: 12px; animation-delay: -3s; }
+.lignes span { height: 8px; border-radius: 999px; }
+@keyframes flotte { 50% { transform: translateY(-8px); } }
+
+.formulaire { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 16px; }
+.carte {
+  width: 100%; max-width: 420px; padding: 36px; border-radius: 16px;
+  background: var(--carte); border: 1px solid var(--bord); box-shadow: 0 12px 32px rgb(9 9 11 / 6%);
+}
+.carte h1 { margin: 0; font-size: 24px; letter-spacing: -0.4px; }
+.aide { margin: 6px 0 0; font-size: 14px; color: var(--doux); }
+.alerte {
+  margin-top: 20px; padding: 12px 14px; border-radius: 10px; font-size: 14px;
+  background: #fef2f2; border: 1px solid #fecaca; color: #991b1b;
+}
+.alerte strong { display: block; }
+
+form { margin-top: 22px; display: flex; flex-direction: column; gap: 6px; }
+label { margin-top: 10px; font-size: 14px; font-weight: 500; color: #3f3f46; }
+.champ { position: relative; }
+.champ > svg { position: absolute; left: 14px; top: 14px; color: #71717a; }
+.champ input {
+  width: 100%; height: 46px; padding: 0 48px 0 42px; border: 1px solid var(--bord); border-radius: 10px;
+  background: var(--carte); color: var(--texte); font: inherit; font-size: 15px;
+}
+.champ input::placeholder { color: #71717a; }
+.champ input:focus { outline: none; border-color: var(--texte); box-shadow: 0 0 0 3px rgb(9 9 11 / 8%); }
+.champ input[aria-invalid='true'] { border-color: #fca5a5; }
+.oeil {
+  position: absolute; right: 4px; top: 4px; width: 38px; height: 38px; border: 0; border-radius: 8px;
+  background: none; color: var(--doux); display: grid; place-items: center; cursor: pointer;
+}
+.oeil:hover { background: var(--gris); }
+.principal {
+  height: 46px; margin-top: 16px; padding: 0 20px; border: 0; border-radius: 10px; cursor: pointer;
+  background: var(--texte); color: #fff; font: inherit; font-size: 15px; font-weight: 600;
+}
+.principal:hover { background: #27272a; }
+.principal:disabled { opacity: 0.7; cursor: progress; }
+.pied { margin: 22px 0 0; font-size: 13px; color: var(--doux); }
+
+/* ---------- Accueil provisoire ---------- */
+.accueil { min-height: 100vh; display: grid; place-items: center; padding: 16px; }
+
+@media (max-width: 900px) { .vitrine { display: none; } }
+@media (prefers-reduced-motion: reduce) { .deco { animation: none; } }

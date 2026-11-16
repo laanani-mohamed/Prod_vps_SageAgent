@@ -1,0 +1,37 @@
+[Unit]
+Description=Front ITBORD - Next.js (nouveaux dashboards), port 8504
+After=network.target SageAgent_api.service
+
+# Protection contre la Boucle Infinie
+StartLimitBurst=5
+StartLimitIntervalSec=60
+
+[Service]
+User=amohamed
+Group=amohamed
+
+WorkingDirectory=/opt/SageAgent/app/src/front
+
+# Node 22 déjà présent sur le serveur (celui de hermes) ; build préalable : npm ci && npm run build
+ExecStart=/home/amohamed/.hermes/node/bin/node node_modules/next/dist/bin/next start -p 8504 -H 0.0.0.0
+
+# API appelée côté serveur uniquement (le navigateur ne parle qu'au front)
+Environment=API_URL=http://127.0.0.1:8000
+Environment=NODE_ENV=production
+Environment=NEXT_TELEMETRY_DISABLED=1
+
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+
+
+-------------
+# Installation (une seule fois)
+sudo cp /opt/SageAgent/service/SageAgent_front /etc/systemd/system/SageAgent_front.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now SageAgent_front.service
+
+# Mise à jour du front
+cd /opt/SageAgent/app/src/front && npm ci && npm run build && sudo systemctl restart SageAgent_front.service

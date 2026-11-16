@@ -144,6 +144,8 @@ def secured_handle(
             client_schema=client_schema,
             details=str(e)
         )
+        if isinstance(e, HTTPException):   # erreur voulue par le service (ex : 400 filtre invalide)
+            raise e
         if isinstance(e, FileNotFoundError):
             raise HTTPException(status_code=404, detail=str(e))
         raise HTTPException(status_code=500, detail="Erreur interne du serveur")

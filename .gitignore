@@ -1,3 +1,8 @@
 # Données ETL locales — ne doivent pas être versionnées
 storage_srv/
 app/logs/
+
+# Front Next.js (app/src/front) — dépendances et build régénérés par npm ci / npm run build
+node_modules/
+.next/
+next-env.d.ts

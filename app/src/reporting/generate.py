@@ -42,9 +42,6 @@ from config.etl_config import REPORT_BASE_PATH  # noqa: E402
 from config.rapports_config import RAPPORTS_CLIENTS  # noqa: E402
 from reporting import rapports  # noqa: E402
 from reporting.envoi import adresse_valide, envoyer_rapports  # noqa: E402
-from reporting.exports import (  # noqa: E402
-    export_df_to_excel, export_df_to_pdf, export_sections_to_excel, export_visite_to_pdf,
-)
 
 logger = logging.getLogger("reporting.generate")
 
@@ -113,50 +110,54 @@ def _donnees(response) -> list:
 
 
 # ---------------------------------------------------------------------------
-# Un générateur par rapport : (schéma, filtres) → (Rapport, filtres appliqués)
+# Un générateur par rapport : (schéma, filtres, co_no) → (Rapport, filtres appliqués)
+# co_no : commerciaux à garder (F_DOCENTETE.co_no, vide = tous) — imposé par l'API pour un
+# collaborateur ; ignoré par les rapports de stock, réservés au directeur.
 # ---------------------------------------------------------------------------
-def _chiffre_affaire(schema: str, f: dict):
+def _chiffre_affaire(schema: str, f: dict, co_no: list):
     group_by = _choix(f, "group_by", GROUP_BY, "client")
     debut, fin = _dates(f) or _periode_nommee(f)
-    req = RapportCARequest(client_schema=schema, group_by=group_by, date_from=debut.isoformat(), date_to=fin.isoformat())
+    req = RapportCARequest(client_schema=schema, group_by=group_by, date_from=debut.isoformat(), date_to=fin.isoformat(),
+                           co_no=co_no)
     rows = _donnees(bi_service.get_rapport_ca(req))
     return (rapports.rapport_ca(rows, group_by, debut.isoformat(), fin.isoformat()),
             {**f, "group_by": group_by, "date_from": debut.isoformat(), "date_to": fin.isoformat()})
 
 
-def _comparaison_ca(schema: str, f: dict):
+def _comparaison_ca(schema: str, f: dict, co_no: list):
     group_by = _choix(f, "group_by", GROUP_BY, "client")
     p2 = _dates(f, "_2") or _periode_nommee(f)
     p1 = _dates(f, "_1") or (_un_an_avant(p2[0]), _un_an_avant(p2[1]))
     p1, p2 = tuple(d.isoformat() for d in p1), tuple(d.isoformat() for d in p2)
 
     def _ca(periode):
-        req = RapportCARequest(client_schema=schema, group_by=group_by, date_from=periode[0], date_to=periode[1])
+        req = RapportCARequest(client_schema=schema, group_by=group_by, date_from=periode[0], date_to=periode[1],
+                               co_no=co_no)
         return _donnees(bi_service.get_rapport_ca(req))
 
     return (rapports.rapport_comparaison_ca(_ca(p1), _ca(p2), group_by, p1, p2),
             {**f, "group_by": group_by, "date_from_1": p1[0], "date_to_1": p1[1], "date_from_2": p2[0], "date_to_2": p2[1]})
 
 
-def _balance(schema: str, f: dict):
+def _balance(schema: str, f: dict, co_no: list):
     commercial = _entier(f, "commercial")
-    rows = _donnees(bi_service.get_balance_client(BalanceClientRequest(client_schema=schema)))
+    rows = _donnees(bi_service.get_balance_client(BalanceClientRequest(client_schema=schema, co_no=co_no)))
     return rapports.rapport_balance(rows, commercial), dict(f)
 
 
-def _balance_agee(schema: str, f: dict):
+def _balance_agee(schema: str, f: dict, co_no: list):
     commercial = _entier(f, "commercial")
-    rows = _donnees(bi_service.get_balance_agee(BalanceClientRequest(client_schema=schema)))
+    rows = _donnees(bi_service.get_balance_agee(BalanceClientRequest(client_schema=schema, co_no=co_no)))
     return rapports.rapport_balance_agee(rows, commercial), dict(f)
 
 
-def _valeur_stock(schema: str, f: dict):
+def _valeur_stock(schema: str, f: dict, co_no: list):
     depots, familles, articles = _liste(f, "depots"), _liste(f, "familles"), _liste(f, "articles")
     rows = _donnees(bi_service.get_valeur_stock(ValeurStockRequest(client_schema=schema)))
     return rapports.rapport_valeur_stock(rows, depots, familles, articles), dict(f)
 
 
-def _visite_client(schema: str, f: dict):
+def _visite_client(schema: str, f: dict, co_no: list):
     code = f.get("client")
     if not isinstance(code, str) or not code:
         raise ValueError("visite_client : le filtre 'client' (code client Sage, ex : \"C0015\") est obligatoire")
@@ -165,25 +166,26 @@ def _visite_client(schema: str, f: dict):
     ))
     if not tiers:
         raise ValueError(f"visite_client : client Sage '{code}' introuvable")
-    data = _donnees(bi_service.get_rapport_visite(RapportVisiteClientRequest(client_schema=schema, do_tiers=code)))
+    data = _donnees(bi_service.get_rapport_visite(RapportVisiteClientRequest(client_schema=schema, do_tiers=code,
+                                                                             co_no=co_no)))
     return rapports.rapport_visite_client(data[0] if data else {}, code, tiers[0].get("ct_intitule", "")), dict(f)
 
 
-def _produits_dormants(schema: str, f: dict):
+def _produits_dormants(schema: str, f: dict, co_no: list):
     mois = _entier(f, "mois", 6)
     req = StockInsightRequest(client_schema=schema, insight_type="dormant", dormant_days=mois * 30, limit=100000000)
     rows = _donnees(stock_service.get_specific(req, endpoint="/api/stock/insights"))
     return rapports.rapport_dormants(rows, mois), {**f, "mois": mois}
 
 
-def _lots_peremption(schema: str, f: dict):
+def _lots_peremption(schema: str, f: dict, co_no: list):
     jours = _entier(f, "jours", 60)
     req = StockInsightRequest(client_schema=schema, insight_type="expiration", expiry_days=jours, limit=100000000)
     rows = _donnees(stock_service.get_specific(req, endpoint="/api/stock/insights"))
     return rapports.rapport_peremption(rows, jours), {**f, "jours": jours}
 
 
-def _consommation(schema: str, f: dict):
+def _consommation(schema: str, f: dict, co_no: list):
     data = _donnees(bi_service.get_rapport_consommation(RapportConsommationRequest(client_schema=schema)))
     return rapports.rapport_consommation(data[0] if data else {}), dict(f)
 
@@ -200,6 +202,22 @@ RAPPORTS = {
     "lots_peremption":   (_lots_peremption, {"jours"}),
     "consommation":      (_consommation, set()),
 }
+
+
+def construire(rapport: str, schema: str, filtres: dict = None, co_no: list = None) -> tuple:
+    """(Rapport, filtres appliqués) de `rapport` pour `schema` (co_no : voir les générateurs ci-dessus).
+    ValueError si le rapport ou un filtre est inconnu ou invalide."""
+    if rapport not in RAPPORTS:
+        raise ValueError(f"Rapport inconnu '{rapport}' (disponibles : {', '.join(RAPPORTS)})")
+    generateur, filtres_acceptes = RAPPORTS[rapport]
+    filtres = filtres or {}
+    inconnus = set(filtres) - filtres_acceptes
+    if inconnus:
+        raise ValueError(
+            f"Filtre(s) inconnu(s) pour '{rapport}' : {', '.join(sorted(inconnus))} "
+            f"(acceptés : {', '.join(sorted(filtres_acceptes)) or 'aucun'})"
+        )
+    return generateur(schema, filtres, co_no or [])
 
 
 # ---------------------------------------------------------------------------
@@ -224,47 +242,15 @@ def _nom_libre(dossier: str, nom: str) -> str:
     return candidat
 
 
-def _derniere_maj_text(last_update: str) -> str:
-    """Même ligne que le PDF du dashboard : 'Derniere mise a jour: JJ/MM/AAAA HH:MM' (vide si inconnue)."""
-    if not last_update:
-        return ""
-    return f"Derniere mise a jour: {datetime.fromisoformat(last_update).strftime('%d/%m/%Y %H:%M')}"
-
-
-def _fichiers(rapport: rapports.Rapport, derniere_maj: str) -> tuple:
-    """(PDF, Excel) avec les mêmes fonctions d'export que les boutons de l'onglet du dashboard."""
-    if rapport.pdf_par_section:
-        pdf = export_visite_to_pdf(rapport.sections, rapport.titre, rapport.sous_titre, derniere_maj=derniere_maj)
-    else:
-        pdf = export_df_to_pdf(rapport.sections[0][1], rapport.titre, rapport.sous_titre, derniere_maj=derniere_maj)
-
-    if len(rapport.sections) == 1 or rapport.nb_lignes == 0:
-        # Plusieurs sections toutes vides : une feuille vide plutôt qu'un classeur sans feuille (invalide)
-        excel = export_df_to_excel(rapport.sections[0][1])
-    else:
-        excel = export_sections_to_excel(rapport.sections)
-    return pdf, excel
-
-
 def generate_report(client: str, rapport: str, filtres: dict = None) -> str:
     """Génère `rapport` pour `client`, dépose le PDF, l'Excel et le .json de détail,
     et retourne le chemin du .json."""
-    if rapport not in RAPPORTS:
-        raise ValueError(f"Rapport inconnu '{rapport}' (disponibles : {', '.join(RAPPORTS)})")
-    generateur, filtres_acceptes = RAPPORTS[rapport]
-    filtres = filtres or {}
-    inconnus = set(filtres) - filtres_acceptes
-    if inconnus:
-        raise ValueError(
-            f"Filtre(s) inconnu(s) pour '{rapport}' : {', '.join(sorted(inconnus))} "
-            f"(acceptés : {', '.join(sorted(filtres_acceptes)) or 'aucun'})"
-        )
     dossier_client, schema = _client_schema(client)
 
     init_db_pool()
-    result, filtres_appliques = generateur(schema, filtres)
+    result, filtres_appliques = construire(rapport, schema, filtres)
     last_update = bi_service.get_last_update(schema).last_update
-    pdf, excel = _fichiers(result, _derniere_maj_text(last_update))
+    pdf, excel = result.pdf(last_update), result.excel()
 
     now = datetime.now()
     dossier = os.path.join(REPORT_BASE_PATH, dossier_client, now.strftime("%Y-%m-%d"))

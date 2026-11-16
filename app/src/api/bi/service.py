@@ -10,13 +10,15 @@ Architecture miroir du module stock :
 from __future__ import annotations
 import logging
 
+from fastapi import HTTPException, Response
+
 from api.bi.schemas import (
     DashboardRequest, DashboardResponse,
     ObjectifsResponse, LastUpdateResponse,
     RapportCARequest, TopClientsRequest, TopArticlesRequest,
     RapportResponse, KpiAnalytiqueResponse,
     RapportVisiteClientRequest, ValeurStockRequest,
-    RapportConsommationRequest, StatsTiersRequest,
+    RapportConsommationRequest, StatsTiersRequest, RapportRequest,
 )
 from api.bi.use_cases import (
     dashboard_uc,
@@ -35,6 +37,32 @@ from api.bi.use_cases import (
 )
 
 logger = logging.getLogger("api.bi.service")
+
+_TYPES_EXPORT = {"pdf": "application/pdf", "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}
+
+
+def get_rapport(req: RapportRequest, nom: str, format: str):
+    """Rapport `nom` mis en forme par reporting/ (même logique que la tâche planifiée) :
+    JSON (titre, sections, totaux, répartition) ou fichier PDF / Excel."""
+    from reporting.generate import construire   # import local : reporting.generate importe ce module
+    try:
+        rapport, filtres = construire(nom, req.client_schema, req.filtres, req.co_no)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    if format == "json":
+        return {
+            "titre": rapport.titre, "sous_titre": rapport.sous_titre, "filtres": filtres,
+            "totaux": rapport.totaux, "repartition": rapport.repartition,
+            "sections": [
+                {"titre": titre, "colonnes": list(df.columns),
+                 "lignes": df.astype(object).where(df.notna(), None).values.tolist()}   # NaN → null (JSON)
+                for titre, df in rapport.sections
+            ],
+        }
+    contenu = rapport.pdf(get_last_update(req.client_schema).last_update) if format == "pdf" else rapport.excel()
+    return Response(contenu, media_type=_TYPES_EXPORT[format],
+                    headers={"Content-Disposition": f'attachment; filename="{rapport.nom}.{format}"'})
 
 
 def get_dashboard(req: DashboardRequest) -> DashboardResponse:

@@ -3,14 +3,17 @@ reporting/rapports.py — Mise en forme des rapports : lignes renvoyées par l'A
 
 Sans Streamlit ni accès base. Reprend la logique des onglets de dashboard_bi/pages/7_Rapports.py
 pour que le rapport généré par la tâche planifiée soit identique à celui téléchargé depuis le dashboard.
+Utilisé par la tâche planifiée (reporting/generate.py) et par l'API (POST /api/bi/rapports/{nom}).
 """
 import logging
 import re
-from dataclasses import dataclass
-from datetime import date
+from dataclasses import dataclass, field
+from datetime import date, datetime
 from typing import Optional
 
 import pandas as pd
+
+from reporting.exports import export_df_to_excel, export_df_to_pdf, export_sections_to_excel, export_visite_to_pdf
 
 logger = logging.getLogger("reporting.rapports")
 
@@ -22,10 +25,38 @@ class Rapport:
     sous_titre: str
     sections: list                  # [(libellé, DataFrame)] — une seule pour la plupart des rapports
     pdf_par_section: bool = False   # True → PDF avec un bandeau titre par section (export_visite_to_pdf), comme l'onglet
+    totaux: dict = field(default_factory=dict)       # ligne « Total » : {"nombre": n, "<colonne>": total}
+    repartition: list = field(default_factory=list)  # données du graphique : [{"libelle", "valeur", "nombre"}]
 
     @property
     def nb_lignes(self) -> int:
         return sum(len(df) for _, df in self.sections)
+
+    def pdf(self, derniere_maj: str = "") -> bytes:
+        """Même PDF que les boutons de l'onglet ; `derniere_maj` = horodatage ISO des données du client."""
+        texte = f"Derniere mise a jour: {datetime.fromisoformat(derniere_maj).strftime('%d/%m/%Y %H:%M')}" if derniere_maj else ""
+        if self.pdf_par_section:
+            return export_visite_to_pdf(self.sections, self.titre, self.sous_titre, derniere_maj=texte)
+        return export_df_to_pdf(self.sections[0][1], self.titre, self.sous_titre, derniere_maj=texte)
+
+    def excel(self) -> bytes:
+        if len(self.sections) == 1 or self.nb_lignes == 0:
+            # Plusieurs sections toutes vides : une feuille vide plutôt qu'un classeur sans feuille (invalide)
+            return export_df_to_excel(self.sections[0][1])
+        return export_sections_to_excel(self.sections)
+
+
+def _somme(df: pd.DataFrame, colonnes) -> dict:
+    """{colonne: total} des colonnes présentes."""
+    return {c: float(pd.to_numeric(df[c], errors="coerce").sum()) for c in colonnes if c in df.columns}
+
+
+def _repartition(df: pd.DataFrame, par, valeur: str, trier: bool = True) -> list:
+    """[{libelle, valeur, nombre}] : total de `valeur` et nombre de lignes par `par` (du plus gros au plus petit si `trier`)."""
+    g = df.groupby(par, observed=False)[valeur].agg(["sum", "size"])
+    if trier:
+        g = g.sort_values("sum", ascending=False)
+    return [{"libelle": str(k), "valeur": float(s), "nombre": int(n)} for k, s, n in zip(g.index, g["sum"], g["size"])]
 
 
 def evolution_pct(p1: float, p2: float) -> float:
@@ -61,11 +92,15 @@ def rapport_ca(rows: list, group_by: str, date_from: str, date_to: str) -> Rappo
     df = pd.DataFrame(rows)
     rename_map = {**_CA_RENAME[group_by], **_CA_RATIO_COLS}
     df = df.rename(columns={k: v for k, v in rename_map.items() if k in df.columns})
+    totaux = {"nombre": len(df), **_somme(df, ["CA HT", "Nb Factures"])}
+    if totaux.get("Nb Factures"):
+        totaux["Moyenne / Facture"] = totaux["CA HT"] / totaux["Nb Factures"]
     return Rapport(
         nom="chiffre_affaire",
         titre=f"Rapport CA par {_GROUP_LABELS[group_by]}",
         sous_titre=f"Période : {date_from} au {date_to}",
         sections=[("Chiffre d'Affaire", df)],
+        totaux=totaux,
     )
 
 
@@ -122,6 +157,7 @@ def rapport_comparaison_ca(rows_p1: list, rows_p2: list, group_by: str, periode_
                 df_show[col] = df_show[col].replace({0: "Non identifié", "0": "Non identifié", "": "Non identifié"})
 
     df_show = df_show[[c for c in _CMP_ORDER[group_by] if c in df_show.columns]]
+    p1, p2 = float(df_show["CA Période 1"].sum()), float(df_show["CA Période 2"].sum())
 
     return Rapport(
         nom="comparaison_ca",
@@ -131,6 +167,8 @@ def rapport_comparaison_ca(rows_p1: list, rows_p2: list, group_by: str, periode_
             f"Période 2 : {periode_2[0]} au {periode_2[1]}"
         ),
         sections=[("Comparaison CA", df_show)],
+        totaux={"nombre": len(df_show), "CA Période 1": p1, "CA Période 2": p2,
+                "Ecart (MAD)": p2 - p1, "Evolution (%)": evolution_pct(p1, p2)},
     )
 
 
@@ -155,6 +193,14 @@ def _non_identifie(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def _totaux_balance(df: pd.DataFrame) -> dict:
+    """Clients distincts (un client peut avoir une ligne par commercial) et total de chaque colonne de montant."""
+    if df.empty:
+        return {"nombre": 0}
+    return {"nombre": int(df["Ref Client"].nunique()),
+            **_somme(df, [c for c in df.columns if c not in ("Ref Client", "Nom Client", "Commercial")])}
+
+
 def rapport_balance(rows: list, commercial: Optional[int] = None) -> Rapport:
     """Balance par clients : A Nouveau, un mois par colonne, En Cours, Totale."""
     df, libelle = _filtre_commercial(pd.DataFrame(rows), commercial)
@@ -171,6 +217,7 @@ def rapport_balance(rows: list, commercial: Optional[int] = None) -> Rapport:
         titre="Balance par Clients",
         sous_titre=_sous_titre_genere(f" - Commercial : {libelle}" if libelle != "Tout" else ""),
         sections=[("Balance par Clients", df)],
+        totaux=_totaux_balance(df),
     )
 
 
@@ -187,6 +234,7 @@ def rapport_balance_agee(rows: list, commercial: Optional[int] = None) -> Rappor
         sous_titre=_sous_titre_genere(f" - Commercial : {libelle}" if libelle != "Tout" else ""),
         sections=[("Balance Âgée par Clients", df)],
         pdf_par_section=True,
+        totaux=_totaux_balance(df),
     )
 
 
@@ -238,6 +286,8 @@ def rapport_valeur_stock(rows: list, depots: Optional[list] = None, familles: Op
         titre="Valeur du Stock",
         sous_titre=f"Dépôts : {_libelle(depots)} | Familles : {_libelle(familles)} | Articles : {_libelle(articles)}",
         sections=[("Valeur du Stock", df_show)],
+        totaux={"nombre": len(df_show), **_somme(df_show, ["Qté Stock", "Valeur Stock"])},
+        repartition=_repartition(df_show, "Dépôt", "Valeur Stock"),   # valeur par dépôt
     )
 
 
@@ -284,9 +334,13 @@ _DORMANT_RENAME = {
 }
 
 
+_TRANCHES_DORMANTS = ["Moins d'1 an", "1 à 2 ans", "2 à 5 ans", "Plus de 5 ans", "Jamais vendu"]
+
+
 def rapport_dormants(rows: list, mois: int) -> Rapport:
     """Produits sans vente depuis plus de `mois` mois."""
     df = pd.DataFrame(rows)
+    totaux, repartition = {"nombre": 0}, []
     if not df.empty:
         df = df.rename(columns={k: v for k, v in _DORMANT_RENAME.items() if k in df.columns})
         cols = [v for v in _DORMANT_RENAME.values() if v in df.columns]
@@ -295,6 +349,11 @@ def rapport_dormants(rows: list, mois: int) -> Rapport:
         for c in ["Prix Achat", "Valeur Stock", "Qté Totale"]:
             if c in df.columns:
                 df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0.0)
+        totaux = {"nombre": len(df), **_somme(df, ["Qté Totale", "Valeur Stock"])}
+        # Ancienneté de la dernière vente, en jours (999999 ou vide = jamais vendu), avant sa mise en texte
+        jours = pd.to_numeric(df["Mois Inactivité"], errors="coerce").fillna(999999)
+        tranche = pd.cut(jours, [-1, 365, 730, 1825, 999998, float("inf")], labels=_TRANCHES_DORMANTS)
+        repartition = _repartition(df.assign(Tranche=tranche), "Tranche", "Valeur Stock", trier=False)
         if "Dernière Vente" in df.columns:
             df["Dernière Vente"] = pd.to_datetime(df["Dernière Vente"], errors="coerce").dt.strftime("%d/%m/%Y").fillna("-")
         if "Mois Inactivité" in df.columns:
@@ -307,6 +366,8 @@ def rapport_dormants(rows: list, mois: int) -> Rapport:
         sous_titre=f"Inactivite > {mois} mois",
         sections=[(f"Produits Dormants (inactifs > {mois} mois)", df)],
         pdf_par_section=True,
+        totaux=totaux,
+        repartition=repartition,   # valeur et nombre de produits par ancienneté
     )
 
 
