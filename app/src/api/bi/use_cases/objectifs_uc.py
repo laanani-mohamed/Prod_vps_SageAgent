@@ -20,6 +20,7 @@ logger = logging.getLogger("api.bi.use_cases.objectifs")
 # Constantes métier
 OBJECTIF_CA    = 25_000_000.0   # MAD
 LIMITE_ENCOURS = 30_000_000.0  # MAD
+LIMITE_DETTES  = 20_000_000.0  # MAD (dettes fournisseurs, tableau de bord)
 SEUIL_CA_WARN  = 60.0          # % → alerte si CA < 60 % de l'objectif
 SEUIL_ENC_WARN = 50.0          # % → alerte si encours > 50 % de la limite
 

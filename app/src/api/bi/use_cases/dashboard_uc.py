@@ -11,6 +11,7 @@ import polars as pl
 
 from api.bi.schemas import DashboardRequest, DashboardResponse, KPIData
 from api.bi.repositories.factory_repo import get_bi_repo
+from api.bi.use_cases.objectifs_uc import OBJECTIF_CA, LIMITE_ENCOURS, LIMITE_DETTES
 from api.bi.repositories.archive_repo.base_bi_archive import safe_float_col
 from api.bi.business_logic.kpi_calculations import (
     prepare_docentete,
@@ -24,6 +25,14 @@ from api.bi.business_logic.kpi_calculations import (
 )
 
 logger = logging.getLogger("api.bi.use_cases.dashboard")
+
+
+def _ratios(kpis: KPIData) -> None:
+    """% de l'objectif CA et des limites d'encours / de dettes (constantes de objectifs_uc)."""
+    pct = lambda v, ref: None if v is None else round(v / ref * 100, 1)
+    kpis.pct_objectif_ca = pct(kpis.chiffre_affaires, OBJECTIF_CA)
+    kpis.pct_limite_encours = pct(kpis.encours_clients, LIMITE_ENCOURS)
+    kpis.pct_limite_dettes = pct(kpis.dettes_fournisseurs, LIMITE_DETTES)
 
 
 def execute(req: DashboardRequest) -> DashboardResponse:
@@ -60,6 +69,7 @@ def execute(req: DashboardRequest) -> DashboardResponse:
     # Vue d'un commercial (collaborateur) : achats, dettes fournisseurs et stock ne sont pas renvoyés
     if req.co_no:
         kpis.total_achats = kpis.dettes_fournisseurs = kpis.valeur_stock = None
+        _ratios(kpis)
         return DashboardResponse(
             client_schema=req.client_schema, source=req.source_type,
             date_from=req.date_from, date_to=req.date_to, kpis=kpis,
@@ -76,6 +86,7 @@ def execute(req: DashboardRequest) -> DashboardResponse:
     except Exception as exc:
         logger.warning("[BI/dashboard] Valorisation stock non disponible : %s", exc)
 
+    _ratios(kpis)
     return DashboardResponse(
         client_schema=req.client_schema,
         source=req.source_type,

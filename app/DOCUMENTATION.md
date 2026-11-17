@@ -31,13 +31,14 @@ Sage**. Chaque client exporte régulièrement 11 tables Sage en fichiers texte. 
 charge dans PostgreSQL (un schéma par client), puis les expose via une API et des tableaux de
 bord.
 
-L'application `app/` contient **5 briques**, qui partagent la même configuration et la même base :
+L'application `app/` contient **6 briques**, qui partagent la même configuration et la même base :
 
 | Brique | Dossier | Techno | Rôle | Lancement |
 |---|---|---|---|---|
 | **ETL** | `src/etl/` | Python, Polars, psycopg2 | Surveille les dépôts SFTP des clients, valide les fichiers et les charge dans PostgreSQL | service `SageAgent_etl` |
 | **API BI** | `src/api/` | FastAPI, Uvicorn | Expose les données (stock, référentiel, transactions, KPIs, rapports), protégée par JWT | service `SageAgent_api` (port 8000) |
 | **Dashboard BI « ITBORD »** | `src/dashboard_bi/` | Streamlit, Plotly | Interface des clients finaux : tableau de bord, fichiers de base, ventes/achats, stock, règlements, rapports | `SageAgent_dashbi` (8505) ou une instance par client `sageagent-dashbi@<client>` (8506 à 8511) |
+| **Front ITBORD (nouveaux dashboards)** | `src/front/` | Next.js 16, React 19, TypeScript | Remplaçant du Dashboard BI : connexion, tableau de bord, fichier de base, ventes, achats, stock (+ plan des dépôts), règlements et les 9 rapports. Le navigateur ne parle qu'au front, qui appelle l'API côté serveur (jetons dans des cookies httpOnly) ; filtres et sélections dans l'URL, aucun calcul métier dans le front | service `SageAgent_front` (port 8504) |
 | **Dashboard Ops** | `src/dashboard_ops/` | Streamlit | Outil **interne** : suivi des runs ETL, investigation d'erreurs, état des services, journal d'accès API, onboarding de nouveaux clients | lancement manuel (port 8585) |
 | **Rapports planifiés** | `src/reporting/` | pandas, fpdf, openpyxl, SMTP | Génère les rapports PDF/Excel de chaque client et les envoie par email | `SageAgent_rapports.timer` (tous les jours à 07:00, heure du Maroc), fourni dans `service/` mais **pas encore installé** |
 
@@ -142,6 +143,9 @@ cd src/dashboard_bi && ../../.venv/bin/python -m streamlit run app.py --server.p
 # Dashboard BI (instance d'un client, derrière nginx)
 .venv/bin/streamlit run src/dashboard_bi/app.py --server.port=8506 --server.address=127.0.0.1
 
+# Front Next.js (Node 22 : /home/amohamed/.hermes/node/bin dans le PATH)
+cd src/front && npm ci && npm run build && npm start      # http://<IP>:8504 ; développement : npm run dev
+
 # Dashboard Ops (interne)
 nohup .venv/bin/streamlit run src/dashboard_ops/app.py --server.port 8585 --server.headless true > /tmp/dashboard_ops.log 2>&1 &
 
@@ -213,7 +217,8 @@ app/
     ├── api/             API FastAPI (auth, bi, stock, referentiel, transactions)
     ├── dashboard_bi/    application Streamlit des clients (ITBORD)
     ├── dashboard_ops/   application Streamlit interne d'observabilité
-    └── reporting/       génération planifiée des rapports et envoi par email
+    ├── front/           nouveaux dashboards Next.js (proxy.ts : session ; app/ : une page par section ; components/ : menu, cadre, tableaux, graphiques ; lib/ : API, formats, paramètres d'URL)
+    └── reporting/       mise en forme des rapports (API + tâche planifiée) et envoi par email
 ```
 
 **Imports** : il n'y a pas de package installé. Chaque point d'entrée ajoute lui-même `app/` et
@@ -232,7 +237,7 @@ locaux du type `from services.base import …` ou `from components.… import �
 | `.token` | Jeton stocké en fichier | **N'est utilisé par aucun code.** Versionné dans git : à supprimer du dépôt. |
 | `.gitignore` | Exclusions git propres à `app/` | Ignore `.venv/`, `__pycache__`, `*.log`, `.env.*`, `storage_srv`. Attention : `.env` (sans suffixe) **n'est pas** ignoré. |
 | `.streamlit/config.toml` | Configuration Streamlit par défaut | Port 8505, mode headless, protection XSRF activée, télémétrie désactivée. Les commandes systemd forcent le port. |
-| `requirements.txt` | Dépendances Python | psycopg2, polars, pyarrow, pandas, fastapi, uvicorn, streamlit, plotly, httpx, openpyxl, fpdf, python-jose, passlib[bcrypt], slowapi, redis, pydantic-settings, watchdog. Contient aussi langgraph, langchain, mcp et pytest, qui ne sont **pas utilisés** pour l'instant (Agent BI prévu). **`tenacity` manque** alors qu'il est importé par `dashboard_bi/services/base.py`. |
+| `requirements.txt` | Dépendances Python | psycopg2, polars, pyarrow, pandas, fastapi, uvicorn, openpyxl et fpdf (exports de l'API et des rapports planifiés), streamlit, plotly, httpx, tenacity, python-jose, passlib[bcrypt], slowapi, redis, pydantic-settings, watchdog. Contient aussi langgraph, langchain, mcp et pytest, qui ne sont **pas utilisés** pour l'instant (Agent BI prévu). Les dépendances du front sont dans `src/front/package.json`. |
 | `clean_nulls.py` | Script CLI : remplace les mots `NULL` par du vide dans les fichiers d'un dossier | Historique. L'ETL utilise sa propre version, `src/etl/utils/null_cleaner.py`. Usage : `python clean_nulls.py <dossier>`. |
 | `DOCUMENTATION.md` | Ce document | — |
 
@@ -432,11 +437,13 @@ Endpoints (tous `analyst`) :
 | `POST /rapport/valeur-stock` | `valeur_stock_uc` | Σ `as_montsto` par dépôt, famille et article |
 | `POST /rapport/consommation` | `consommation_uc` | Consommation par article (colonnes mois en cours + M1 à M6, total, moyenne mensuelle calculée sur les 6 mois complets) et récapitulatif par famille ; les lignes à zéro sont exclues |
 | `POST /stats-tiers` | `stats_tiers_uc` | Statistiques d'un client (`ct_type=0`) ou d'un fournisseur (`ct_type=1`) sur une période, comparée à N-1 |
+| `POST /vues/{nom}` | `api/bi/vues.py` | Données prêtes à afficher des pages du front (filtrées, totalisées, paginées par 50) : `reglements`, `documents`, `document`, `compteurs`, `articles`, `article`, `tiers`, `depots`, `familles`, `stock_etat`, `stock_alertes`, `plan_depots`. Reprend les calculs pandas des pages Streamlit en passant par les services existants. Collaborateur : ses documents ; stock, achats, fournisseurs → 403 |
+| `POST /rapports/{nom}?format=json\|pdf\|xlsx` | `reporting/generate.construire` | Les 9 rapports de l'onglet Rapports, mis en forme par `reporting/rapports.py` (même résultat que la tâche planifiée) : sections (`colonnes`, `lignes`), `totaux` (ligne Total), `repartition` (valeur par dépôt, ancienneté des dormants), ou le fichier PDF / Excel. `filtres` = clés de `config/rapports_config.py` (inconnu ou invalide → 400). Collaborateur : ses chiffres ; rapports de stock → 403 |
 
 | Fichier / dossier | Rôle | Caractéristiques |
 |---|---|---|
 | `__init__.py` | Package | — |
-| `router.py` | Déclaration des 13 endpoints ci-dessus | Chacun passe par `secured_handle`. |
+| `router.py` | Déclaration des 15 endpoints ci-dessus | Chacun passe par `secured_handle`. |
 | `schemas.py` | Modèles Pydantic | `BaseBIRequest` (`client_schema`, `source_type` = `db_latest` par défaut, `snapshot_datetime`), une requête par rapport, `RapportResponse` (enveloppe générique `data` + métadonnées), `DashboardResponse`, `KpiAnalytiqueResponse`… Importé par 14 modules (nœud central d'après graphify). |
 | `service.py` | Répartiteur | Une fonction `get_*` par endpoint, qui appelle `<use_case>.execute(req)`. **Également appelé directement par `reporting/generate.py`.** |
 | `use_cases/*.py` | Un fichier par endpoint (13 fichiers) | Orchestration repository → calculs → réponse. `rapport_visite_uc.py` (le plus gros) et `consommation_uc.py` contiennent les tableaux croisés articles × mois glissants. `balance_agee_uc.py` réutilise le repository de `balance_uc.py`. |
@@ -690,7 +697,7 @@ supprimé depuis. `reporting` importe directement les `service.py` de l'API.
 | Dossier (`/opt/SageAgent/…`) | Rôle |
 |---|---|
 | `storage_srv/` (non versionné) | `upload/<CLIENT>/` (dépôts SFTP, bind mount de `/var/sftp/upload`), `queue/` (file d'attente de l'ETL), `broker_queue/` (ancienne file, vide), `archives/<CLIENT>/<date>/` (succès, sert aussi de snapshots à l'API), `error/<CLIENT>/<date>/` (échecs), `events/events.jsonl` (repli de l'event store), `rapport/<CLIENT>/<date>/` (rapports générés). |
-| `service/` | Unités systemd à copier dans `/etc/systemd/system/` (mode d'emploi en bas de chaque fichier) : `SageAgent_etl`, `SageAgent_api` (port 8000), `SageAgent_dashbi` (port 8505, instance unique), `sageagent-dashbi@` (une instance par client, port lu dans `/etc/sageagent/clients/<client>.env`, modèles dans `service/clients/*.env`), `SageAgent_rapports` + `.timer` (oneshot à 07:00, heure de `Africa/Casablanca`, `Persistent=true`), `sudoers-sftp-onboard` (permet à l'utilisateur du Dashboard Ops de lancer **uniquement** `sftp_onboard.sh` en root). |
+| `service/` | Unités systemd à copier dans `/etc/systemd/system/` (mode d'emploi en bas de chaque fichier) : `SageAgent_etl`, `SageAgent_api` (port 8000), `SageAgent_front` (port 8504, nouveaux dashboards Next.js), `SageAgent_dashbi` (port 8505, instance unique), `sageagent-dashbi@` (une instance par client, port lu dans `/etc/sageagent/clients/<client>.env`, modèles dans `service/clients/*.env`), `SageAgent_rapports` + `.timer` (oneshot à 07:00, heure de `Africa/Casablanca`, `Persistent=true`), `sudoers-sftp-onboard` (permet à l'utilisateur du Dashboard Ops de lancer **uniquement** `sftp_onboard.sh` en root). |
 | `nginx/` | Reverse proxy : `<client>.sageagent.test` → port local de l'instance du client (`map $host $sageagent_port` dans `sageagent_clients.conf`), HTTP → HTTPS. `README.md` explique les notions et la configuration ; `docs/nginx/` décrit les phases 1 (domaine de test) et 2 (vrai domaine). |
 | `certs/` | Clés RSA de signature des JWT (`private.pem`, `public.pem`). |
 | `data_Client/reference/` | `auth.json` : **registre des clients** (clé client → schéma, identifiant, rôle, port du dashboard), lu par `reporting/generate.py` et le Dashboard Ops. Description des tables Sage (`.md`, `.xlsx`, `db_struct.txt`). |

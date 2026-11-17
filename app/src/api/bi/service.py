@@ -18,8 +18,9 @@ from api.bi.schemas import (
     RapportCARequest, TopClientsRequest, TopArticlesRequest,
     RapportResponse, KpiAnalytiqueResponse,
     RapportVisiteClientRequest, ValeurStockRequest,
-    RapportConsommationRequest, StatsTiersRequest, RapportRequest,
+    RapportConsommationRequest, StatsTiersRequest, RapportRequest, VueRequest,
 )
+from api.bi import vues
 from api.bi.use_cases import (
     dashboard_uc,
     objectifs_uc,
@@ -53,7 +54,7 @@ def get_rapport(req: RapportRequest, nom: str, format: str):
     if format == "json":
         return {
             "titre": rapport.titre, "sous_titre": rapport.sous_titre, "filtres": filtres,
-            "totaux": rapport.totaux, "repartition": rapport.repartition,
+            "totaux": rapport.totaux, "repartition": rapport.repartition, "options": rapport.options,
             "sections": [
                 {"titre": titre, "colonnes": list(df.columns),
                  "lignes": df.astype(object).where(df.notna(), None).values.tolist()}   # NaN → null (JSON)
@@ -63,6 +64,18 @@ def get_rapport(req: RapportRequest, nom: str, format: str):
     contenu = rapport.pdf(get_last_update(req.client_schema).last_update) if format == "pdf" else rapport.excel()
     return Response(contenu, media_type=_TYPES_EXPORT[format],
                     headers={"Content-Disposition": f'attachment; filename="{rapport.nom}.{format}"'})
+
+
+def get_vue(req: VueRequest, nom: str):
+    """Données prêtes à afficher d'une page du front (api/bi/vues.py)."""
+    if nom not in vues.VUES:
+        raise HTTPException(status_code=404, detail=f"Vue inconnue '{nom}' (disponibles : {', '.join(vues.VUES)})")
+    try:
+        return vues.VUES[nom](req.client_schema, req.filtres, req.co_no)
+    except KeyError as e:
+        raise HTTPException(status_code=400, detail=f"Filtre obligatoire manquant : {e}")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 def get_dashboard(req: DashboardRequest) -> DashboardResponse:

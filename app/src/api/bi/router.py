@@ -8,6 +8,7 @@ Routes :
   POST /api/bi/top-clients           → Top N clients par CA
   POST /api/bi/top-articles          → Top N articles vendus
   POST /api/bi/rapports/{nom}        → Rapport mis en forme (JSON) ou export ?format=pdf|xlsx
+  POST /api/bi/vues/{nom}            → Données prêtes à afficher d'une page du front Next.js
 """
 import logging
 from typing import Literal
@@ -24,15 +25,16 @@ from api.bi.schemas import (
     RapportCARequest, TopClientsRequest, TopArticlesRequest,
     RapportResponse, KpiAnalytiqueResponse, BalanceClientRequest,
     RapportVisiteClientRequest, ValeurStockRequest,
-    RapportConsommationRequest, StatsTiersRequest, RapportRequest,
+    RapportConsommationRequest, StatsTiersRequest, RapportRequest, VueRequest,
 )
 from api.bi.service import (
     get_dashboard, get_objectifs, get_analytique,
     get_rapport_ca, get_top_clients, get_top_articles,
     get_balance_client, get_rapport_visite, get_valeur_stock,
     get_rapport_consommation, get_balance_agee, get_last_update,
-    get_stats_tiers, get_rapport,
+    get_stats_tiers, get_rapport, get_vue,
 )
+from api.bi.vues import reservee_directeur
 
 logger = logging.getLogger("api.bi.router")
 router = APIRouter(prefix="/api/bi", tags=["BI — Dashboard & Rapports"])
@@ -314,6 +316,13 @@ def stats_tiers(
     )
 
 
+def _refuser(request: Request, user: TokenData, schema: str, endpoint: str, motif: str):
+    """403 journalisé dans l'audit, comme les refus de secured_handle."""
+    log_audit_event("ACCESS_DENIED", endpoint, request.client.host if request.client else "unknown", "FAILED",
+                    username=user.username, client_schema=schema, details=motif)
+    raise HTTPException(status_code=403, detail=motif)
+
+
 # Rapports de stock : sans commercial, donc non filtrables pour un collaborateur
 RAPPORTS_DIRECTEUR = {"valeur_stock", "produits_dormants", "lots_peremption", "consommation"}
 
@@ -342,9 +351,7 @@ def rapport(
 ):
     endpoint = f"/api/bi/rapports/{nom}"
     if nom in RAPPORTS_DIRECTEUR and "collaborateur" in current_user.roles:
-        log_audit_event("ACCESS_DENIED", endpoint, request.client.host if request.client else "unknown", "FAILED",
-                        username=current_user.username, client_schema=req.client_schema, details="Rapport réservé au directeur")
-        raise HTTPException(status_code=403, detail="Rapport réservé au directeur")
+        _refuser(request, current_user, req.client_schema, endpoint, "Rapport réservé au directeur")
     return secured_handle(
         get_rapport,
         endpoint=endpoint,
@@ -354,4 +361,34 @@ def rapport(
         req=req,
         nom=nom,
         format=format,
+    )
+
+
+@router.post(
+    "/vues/{nom}",
+    summary="Données prêtes à afficher d'une page du front (filtrées, totalisées, paginées)",
+    description="""
+Vues de `api/bi/vues.py` : `reglements`, `documents`, `document`, `compteurs`, `articles`, `article`, `tiers`,
+`depots`, `familles`, `stock_etat`, `stock_alertes`, `plan_depots`. `filtres` : propres à chaque vue
+(voir les docstrings), `page` pour la pagination (50 lignes). Filtre manquant ou invalide → 400.
+Collaborateur : ses propres documents ; stock, achats et fournisseurs → 403.
+    """,
+)
+def vue(
+    nom: str,
+    req: VueRequest,
+    request: Request,
+    current_user: TokenData = Depends(DIRECTEUR_OU_COLLABORATEUR)
+):
+    endpoint = f"/api/bi/vues/{nom}"
+    if "collaborateur" in current_user.roles and reservee_directeur(nom, req.filtres):
+        _refuser(request, current_user, req.client_schema, endpoint, "Section réservée au directeur")
+    return secured_handle(
+        get_vue,
+        endpoint=endpoint,
+        request=request,
+        current_user=current_user,
+        client_schema=req.client_schema,
+        req=req,
+        nom=nom,
     )

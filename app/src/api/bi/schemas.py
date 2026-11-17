@@ -59,6 +59,10 @@ class KPIData(BaseModel):
     dettes_fournisseurs: Optional[float] = 0.0
     nb_clients_actifs: int = 0
     ca_evolution_monthly: List[dict] = Field(default_factory=list)
+    # % de l'objectif / des limites de objectifs_uc (None si le montant n'est pas renvoyé)
+    pct_objectif_ca: Optional[float] = None
+    pct_limite_encours: Optional[float] = None
+    pct_limite_dettes: Optional[float] = None
 
 
 class DashboardResponse(BaseModel):
@@ -150,6 +154,10 @@ class RapportRequest(BaseBIRequest):
                     "ex : {\"group_by\": \"client\", \"date_from\": \"2026-01-01\", \"date_to\": \"2026-11-16\"}",
     )
     co_no: List[int] = Field(default_factory=list, description=CO_NO_DESC)
+
+
+class VueRequest(RapportRequest):
+    """Données d'une page du front (POST /api/bi/vues/{nom}) : filtres propres à la vue, `page` pour la pagination."""
 
 
 class TopClientsRequest(BaseBIRequest):

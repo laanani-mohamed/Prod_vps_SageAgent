@@ -245,11 +245,13 @@ def calc_top_fournisseurs(
     else:
         df_top_f = df_top_f.with_columns(pl.col("do_tiers").alias("ct_intitule"))
 
+    total = float(df_top_f["encours"].sum()) or 1.0
     return [
         {
             "ct_num": r["do_tiers"],
             "ct_intitule": r.get("ct_intitule") or r["do_tiers"],
             "encours": round(r["encours"], 2),
+            "pct_encours": round(r["encours"] / total * 100, 1),   # part de l'encours fournisseurs total
         }
         for r in df_top_f.to_dicts()
     ]

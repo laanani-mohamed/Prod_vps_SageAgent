@@ -27,6 +27,7 @@ class Rapport:
     pdf_par_section: bool = False   # True → PDF avec un bandeau titre par section (export_visite_to_pdf), comme l'onglet
     totaux: dict = field(default_factory=dict)       # ligne « Total » : {"nombre": n, "<colonne>": total}
     repartition: list = field(default_factory=list)  # données du graphique : [{"libelle", "valeur", "nombre"}]
+    options: dict = field(default_factory=dict)      # valeurs possibles des filtres (ex : dépôts et familles en stock)
 
     @property
     def nb_lignes(self) -> int:
@@ -156,7 +157,7 @@ def rapport_comparaison_ca(rows_p1: list, rows_p2: list, group_by: str, periode_
             if col in df_show.columns:
                 df_show[col] = df_show[col].replace({0: "Non identifié", "0": "Non identifié", "": "Non identifié"})
 
-    df_show = df_show[[c for c in _CMP_ORDER[group_by] if c in df_show.columns]]
+    df_show = df_show[[c for c in _CMP_ORDER[group_by] if c in df_show.columns]].sort_values("CA Période 2", ascending=False)
     p1, p2 = float(df_show["CA Période 1"].sum()), float(df_show["CA Période 2"].sum())
 
     return Rapport(
@@ -266,9 +267,12 @@ def rapport_valeur_stock(rows: list, depots: Optional[list] = None, familles: Op
     """Valeur du stock par dépôt / famille / article, triée par valeur décroissante.
     Filtres : listes d'intitulés (de_intitule, fa_intitule, ar_design) — absent = tous."""
     df = pd.DataFrame(rows)
+    options = {}
     if df.empty:
         df_show = pd.DataFrame(columns=list(_VALSTOCK_RENAME.values()))
     else:
+        options = {"depots": sorted(df["de_intitule"].dropna().unique().tolist()),
+                   "familles": sorted(df["fa_intitule"].dropna().unique().tolist())}
         for c in ["qte_stock", "prix_revient", "valeur_stock"]:
             if c in df.columns:
                 df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0.0)
@@ -288,6 +292,7 @@ def rapport_valeur_stock(rows: list, depots: Optional[list] = None, familles: Op
         sections=[("Valeur du Stock", df_show)],
         totaux={"nombre": len(df_show), **_somme(df_show, ["Qté Stock", "Valeur Stock"])},
         repartition=_repartition(df_show, "Dépôt", "Valeur Stock"),   # valeur par dépôt
+        options=options,
     )
 
 
@@ -311,12 +316,15 @@ def rapport_visite_client(data: dict, code_client: str, nom_client: str) -> Rapp
         (label, pd.DataFrame(data.get(key) or []))
         for key, label in _VISITE_SECTIONS.items()
     ]
+    factures = sections[1][1]
     return Rapport(
         nom=f"visite_client_{re.sub(r'[^A-Za-z0-9_-]', '_', code_client)}",
         titre=f"Rapport Avant Visite - {code_client} — {nom_client}",
         sous_titre=f"Client : {code_client} — Généré le {date.today().isoformat()}",
         sections=sections,
         pdf_par_section=True,
+        totaux={"BC en cours": len(sections[0][1]), "Factures non réglées": len(factures),
+                **_somme(factures, ["Reste à Payer"])},
     )
 
 
@@ -395,6 +403,7 @@ def rapport_peremption(rows: list, expiry_days: int) -> Rapport:
         sous_titre=f"Expiration dans les {expiry_days} prochains jours",
         sections=[(f"Lots en Peremption (< {expiry_days} jours)", df)],
         pdf_par_section=True,
+        totaux={"nombre": len(df), **_somme(df, ["Qté Restante"])},
     )
 
 
@@ -403,13 +412,16 @@ def rapport_peremption(rows: list, expiry_days: int) -> Rapport:
 # ---------------------------------------------------------------------------
 def rapport_consommation(data: dict) -> Rapport:
     """Consommation des 6 derniers mois : récapitulatif par famille + détail par article."""
+    par_famille = pd.DataFrame(data.get("par_famille") or [])
     return Rapport(
         nom="consommation",
         titre="Rapport Consommation par Produit",
         sous_titre=f"6 derniers mois — Généré le {date.today().isoformat()}",
         sections=[
-            ("Recap par Famille", pd.DataFrame(data.get("par_famille") or [])),
+            ("Recap par Famille", par_famille),
             ("Detail par Article", pd.DataFrame(data.get("par_article") or [])),
         ],
         pdf_par_section=True,
+        totaux={"familles": len(par_famille), "articles": len(data.get("par_article") or []),
+                **_somme(par_famille, ["Qté Totale Consommée"])},
     )
