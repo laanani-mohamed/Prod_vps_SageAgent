@@ -2,9 +2,11 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useFormStatus } from 'react-dom'
 import { deconnexion } from '../app/actions'
 import { surCouleur } from '../lib/format'
 import { RAPPORTS } from '../lib/rapports'
+import { Attente } from './Interactions'
 
 const PAGES = [
   { nom: 'Tableau de Bord', href: '/', base: '/', icone: 'M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v5H3z' },
@@ -24,20 +26,31 @@ function Icone({ d }: { d: string }) {
   )
 }
 
-export default function Menu({ client, collaborateur }: { client: string | null; collaborateur: boolean }) {
+/** Bouton de déconnexion : verrouillé avec un cercle pendant la déconnexion. */
+function Sortir() {
+  const { pending } = useFormStatus()
+  return (
+    <button type="submit" className="secondaire large sortir" disabled={pending} aria-busy={pending}>
+      {pending && <span className="cercle" aria-hidden="true" />}Se déconnecter
+    </button>
+  )
+}
+
+export default function Menu({ client, collaborateur, nom, miseAJour }: { client: string | null; collaborateur: boolean; nom: string | null; miseAJour: string }) {
   const chemin = usePathname()
   const actif = (base: string) => (base === '/' ? chemin === '/' : chemin.startsWith(base))
 
   return (
     <nav className="menu" aria-label="Navigation">
       <div className="marque">
-        <span className="logo">IT</span>ITBORD
+        <span className="logo">IT</span>BORD
       </div>
       {PAGES.map((p) => (
-        <Link key={p.href} href={p.href} className="entree" aria-current={actif(p.base) ? 'page' : undefined}>
+        <Link prefetch={false} key={p.href} href={p.href} className="entree" aria-current={actif(p.base) ? 'page' : undefined}>
           <Icone d={p.icone} />
           {p.nom}
           {collaborateur && p.directeur && <span className="interdit" aria-label="Accès refusé">{INTERDIT}</span>}
+          <Attente />
         </Link>
       ))}
       <div className="entree titre-rapports">
@@ -46,23 +59,31 @@ export default function Menu({ client, collaborateur }: { client: string | null;
       </div>
       <div className="rapports">
         {RAPPORTS.map((r) => (
-          <Link key={r.n} href={`/rapports/${r.n}`} className="sous-entree" aria-current={chemin === `/rapports/${r.n}` ? 'page' : undefined}>
+          <Link prefetch={false} key={r.n} href={`/rapports/${r.n}`} className="sous-entree" aria-current={chemin === `/rapports/${r.n}` ? 'page' : undefined}>
             <span className="numero" style={{ background: r.couleur, color: surCouleur(r.couleur) }}>{r.n}</span>
             <span className="coupe">{r.menu}</span>
             {collaborateur && 'stock' in r && <span className="interdit" aria-label="Accès refusé">{INTERDIT}</span>}
+            <Attente />
           </Link>
         ))}
       </div>
+      <Link prefetch={false} href="/bon-de-commande" className="entree" aria-current={chemin.startsWith('/bon-de-commande') ? 'page' : undefined}>
+        <Icone d="M6 6h15l-2 9H8zM6 6L5 3H2M10 20a1 1 0 1 1-2 0 1 1 0 0 1 2 0zM19 20a1 1 0 1 1-2 0 1 1 0 0 1 2 0z" />
+        Passer bon de commande
+        <Attente />
+      </Link>
       <div className="espace" />
+      <p className="maj">Dernière mise à jour : <span>{miseAJour}</span></p>
       <div className="utilisateur">
         <span className="avatar">{(client ?? '?').slice(0, 2).toUpperCase()}</span>
-        <span>
+        <span className="coupe">
           <strong>{(client ?? '').toUpperCase()}</strong>
           <span className="doux">{collaborateur ? 'Collaborateur' : 'Directeur'}</span>
+          {nom && <span className="doux coupe" title={nom}>{nom}</span>}
         </span>
       </div>
       <form action={deconnexion}>
-        <button type="submit" className="secondaire large">Se déconnecter</button>
+        <Sortir />
       </form>
     </nav>
   )

@@ -37,6 +37,7 @@ from slowapi.errors import RateLimitExceeded
 from api.auth.audit import start_audit_worker, stop_audit_worker
 from api.rate_limiter import limiter
 from api.db import init_db_pool, close_db_pool
+from api.common import prechauffage
 
 
 
@@ -56,7 +57,9 @@ logger = logging.getLogger("api.api")
 async def lifespan(app: FastAPI):
     init_db_pool()
     start_audit_worker()
+    prechauffage.demarrer()   # cache rempli et tenu à jour avec l'ETL (api/common/prechauffage.py)
     yield
+    prechauffage.arreter()
     stop_audit_worker()
     close_db_pool()
 

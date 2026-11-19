@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation'
+import { Telecharger } from '../../../components/Interactions'
 import Page from '../../../components/Page'
 import {
   Barres, Carte, Champ, Colonnes, Entete, Filtres, Interdit, Kpis, Pagination, Pile, Tableau,
@@ -174,8 +175,8 @@ export default async function PageRapport({ params, searchParams }: { params: Pr
 
   const exports = d && (
     <>
-      <a className="secondaire contour-accent" href={lien(`${chemin}/export`, p, { format: 'xlsx' })}>Télécharger Excel</a>
-      <a className="secondaire principal-lien" href={lien(`${chemin}/export`, p, { format: 'pdf' })}>Télécharger PDF</a>
+      <Telecharger className="secondaire contour-accent" href={lien(`${chemin}/export`, p, { format: 'xlsx' })}>Télécharger Excel</Telecharger>
+      <Telecharger className="secondaire principal-lien" href={lien(`${chemin}/export`, p, { format: 'pdf' })}>Télécharger PDF</Telecharger>
     </>
   )
   const section = (i: number) => d!.sections[i]

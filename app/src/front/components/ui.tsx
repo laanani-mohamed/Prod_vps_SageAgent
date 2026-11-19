@@ -3,6 +3,7 @@ import Link from 'next/link'
 import type { CSSProperties, ReactNode } from 'react'
 import { court, entier, pct, surCouleur } from '../lib/format'
 import type { Params } from '../lib/params'
+import { Attente, CorpsCliquable, FormulaireGet } from './Interactions'
 
 export function Entete({ titre, sur, sousTitre, badge, actions }: {
   titre: string; sur?: string; sousTitre?: ReactNode; badge?: ReactNode; actions?: ReactNode
@@ -57,29 +58,31 @@ export function Carte({ titre, note, large, span, children }: { titre?: ReactNod
 export type Colonne = { nom: string; droite?: boolean; largeur?: string }
 export type Ligne = { cellules: ReactNode[]; href?: string; actif?: boolean; total?: boolean; cle?: string }
 
-/** Tableau ; une ligne avec `href` est cliquable (lien sur la 1re cellule, étendu à toute la ligne). */
+/** Tableau ; une ligne avec `href` est cliquable (lien sur la 1re cellule, clic sur toute la ligne : CorpsCliquable).
+ *  Liens en prefetch={false} (ici, menu, onglets, pagination) : sinon Next.js calcule à l'avance chaque lien visible
+ *  (~40 pages lourdes par affichage) et sature l'API avant le vrai clic. */
 export function Tableau({ colonnes, lignes, vide = 'Aucune donnée.' }: { colonnes: Colonne[]; lignes: Ligne[]; vide?: string }) {
   if (!lignes.length) return <p className="vide">{vide}</p>
+  const cliquable = lignes.some((l) => l.href)
+  const rangees = lignes.map((l, i) => (
+    <tr key={l.cle ?? i} className={l.total ? 'total' : l.actif ? 'actif' : undefined} aria-current={l.actif || undefined}>
+      {l.cellules.map((c, j) => (
+        <td key={j} className={colonnes[j]?.droite ? 'droite' : undefined}>
+          {j === 0 && l.href ? <Link prefetch={false} href={l.href} scroll={false}>{c}<Attente /></Link> : c}
+        </td>
+      ))}
+    </tr>
+  ))
   return (
     <div className="defile">
-      <table className={lignes.some((l) => l.href) ? 'tableau cliquable' : 'tableau'}>
+      <table className={cliquable ? 'tableau cliquable' : 'tableau'}>
         <colgroup>
           {colonnes.map((c, i) => <col key={i} style={c.largeur ? { width: c.largeur } : undefined} />)}
         </colgroup>
         <thead>
           <tr>{colonnes.map((c, i) => <th key={i} scope="col" className={c.droite ? 'droite' : undefined}>{c.nom}</th>)}</tr>
         </thead>
-        <tbody>
-          {lignes.map((l, i) => (
-            <tr key={l.cle ?? i} className={l.total ? 'total' : l.actif ? 'actif' : undefined} aria-current={l.actif || undefined}>
-              {l.cellules.map((c, j) => (
-                <td key={j} className={colonnes[j]?.droite ? 'droite' : undefined}>
-                  {j === 0 && l.href ? <Link href={l.href} scroll={false}>{c}</Link> : c}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
+        {cliquable ? <CorpsCliquable>{rangees}</CorpsCliquable> : <tbody>{rangees}</tbody>}
       </table>
     </div>
   )
@@ -159,8 +162,8 @@ export function Onglets({ items, pleineLargeur }: { items: { nom: string; href: 
   return (
     <nav className={pleineLargeur ? 'onglets pleine-largeur' : 'onglets'} aria-label="Sections">
       {items.map((o) => (
-        <Link key={o.href} href={o.href} aria-current={o.actif ? 'page' : undefined} scroll={false}>
-          {o.interdit && '🚫 '}{o.nom}
+        <Link prefetch={false} key={o.href} href={o.href} aria-current={o.actif ? 'page' : undefined} scroll={false}>
+          {o.interdit && '🚫 '}{o.nom}<Attente />
           {o.nombre != null && <span className="pastille">{entier(o.nombre)}</span>}
         </Link>
       ))}
@@ -177,9 +180,9 @@ export function Pagination({ total, page, taille, href }: { total: number; page:
   if (pages <= 1) return null
   return (
     <nav className="pagination" aria-label="Pages">
-      {page > 1 ? <Link href={href(page - 1)} scroll={false}>‹ Précédente</Link> : <span />}
+      {page > 1 ? <Link prefetch={false} href={href(page - 1)} scroll={false}>‹ Précédente<Attente /></Link> : <span />}
       <span className="doux">Page {page} sur {pages} · {entier(total)} lignes</span>
-      {page < pages ? <Link href={href(page + 1)} scroll={false}>Suivante ›</Link> : <span />}
+      {page < pages ? <Link prefetch={false} href={href(page + 1)} scroll={false}>Suivante ›<Attente /></Link> : <span />}
     </nav>
   )
 }
@@ -191,21 +194,21 @@ export function Filtres({ children, bouton = 'Appliquer', colonnes, titre, note,
 }) {
   const valider = <button type="submit" className="principal">{bouton}</button>
   return (
-    <form className={cadre ? 'carte bloc-filtres' : 'bloc-filtres'}>
+    <FormulaireGet className={cadre ? 'carte bloc-filtres' : 'bloc-filtres'}>
       {titre && <div className="carte-titre"><h2 className="moyen">{titre}</h2>{note && <span className="doux petit">{note}</span>}</div>}
       <div className="filtres" style={colonnes ? { gridTemplateColumns: colonnes } : undefined}>
         {children}
         {!suite && valider}
       </div>
       {suite && <div className="filtres-suite">{suite}{valider}</div>}
-    </form>
+    </FormulaireGet>
   )
 }
 
 /** Période (du / au) dans un en-tête : formulaire GET qui garde les autres paramètres de l'URL. */
 export function Periode({ p, du, au, label = 'Période' }: { p: Params; du: string; au: string; label?: string }) {
   return (
-    <form className="periode">
+    <FormulaireGet className="periode">
       {Object.entries(p).filter(([k, v]) => typeof v === 'string' && !['du', 'au', 'page'].includes(k)).map(([k, v]) => (
         <input key={k} type="hidden" name={k} value={v as string} />
       ))}
@@ -214,7 +217,7 @@ export function Periode({ p, du, au, label = 'Période' }: { p: Params; du: stri
       <span aria-hidden="true">–</span>
       <input type="date" name="au" defaultValue={au} aria-label={`${label} : au`} />
       <button type="submit" className="secondaire">OK</button>
-    </form>
+    </FormulaireGet>
   )
 }
 

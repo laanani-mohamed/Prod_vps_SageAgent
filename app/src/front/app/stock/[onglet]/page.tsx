@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import Page from '../../../components/Page'
 import OngletsStock from '../../../components/OngletsStock'
 import Link from 'next/link'
+import { Attente } from '../../../components/Interactions'
 import { Barres, Carte, Champ, Entete, Filtres, Interdit, Kpis, Pagination, Tableau } from '../../../components/ui'
 import { api, estCollaborateur, session, vue } from '../../../lib/api'
 import { cellule, court, date, entier, mad } from '../../../lib/format'
@@ -109,10 +110,10 @@ export default async function PageStock({ params, searchParams }: { params: Prom
     contenu = <>
       <nav className="types-alertes" aria-label="Type d'alerte">
         {r.types.map((t: any) => (
-          <Link key={t.type} href={lien(chemin, {}, { type: t.type })} className="type-alerte" aria-current={t.type === r.type ? 'page' : undefined}>
+          <Link prefetch={false} key={t.type} href={lien(chemin, {}, { type: t.type })} className="type-alerte" aria-current={t.type === r.type ? 'page' : undefined}>
             <span className="nom"><i style={{ background: COULEUR_ALERTE[t.type] }} />{ALERTES[t.type]}</span>
             <strong>{entier(t.nombre)}</strong>
-            <span className="doux petit">{AIDE_ALERTE[t.type]}</span>
+            <span className="doux petit">{AIDE_ALERTE[t.type]}<Attente /></span>
           </Link>
         ))}
       </nav>

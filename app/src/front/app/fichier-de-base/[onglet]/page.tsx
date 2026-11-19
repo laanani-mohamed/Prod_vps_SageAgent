@@ -41,7 +41,7 @@ export default async function FichierDeBase({ params, searchParams }: { params: 
       vue('articles', { design: lire(p, 'design'), ref: lire(p, 'ref'), famille: lire(p, 'famille'), page, taille: 10 }),
       api('/api/referentiel/familles', { client_schema: s.client }),
     ])
-    const ref = lire(p, 'art') || r.lignes[0]?.ar_ref
+    const ref = lire(p, 'art')   // statistiques calculées seulement quand l'utilisateur clique sur un article
     const a = ref && (await vue('article', { ref, date_from: du, date_to: au }))
     contenu = <>
       <Carte>

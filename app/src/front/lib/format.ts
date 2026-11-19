@@ -35,6 +35,11 @@ export function surCouleur(hex: string) {
 export const nomCommercial = (c: { co_no: number; co_nom?: string | null; co_prenom?: string | null }) =>
   c.co_no === 0 ? 'Non identifié' : [c.co_nom, c.co_prenom].filter(Boolean).join(' ') || `Commercial ${c.co_no}`
 
+/** Horodatage ISO → 'JJ/MM/AAAA HH:MM', à l'heure enregistrée par l'ETL (comme Streamlit et les rapports PDF). */
+export const dateHeure = (iso?: string | null) => (iso
+  ? new Date(iso).toLocaleString('fr-FR', { timeZone: 'UTC', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+  : '-')
+
 /** Options d'une liste déroulante de commerciaux (réponse de /api/referentiel/collaborateurs). */
 export const optionsCommerciaux = (rep: { data?: any[] } | null): [string, string][] =>
   [['', 'Tous'], ...(rep?.data ?? []).map((c): [string, string] => [String(c.co_no), nomCommercial(c)])]

@@ -9,6 +9,7 @@ Routes :
   POST /api/bi/top-articles          → Top N articles vendus
   POST /api/bi/rapports/{nom}        → Rapport mis en forme (JSON) ou export ?format=pdf|xlsx
   POST /api/bi/vues/{nom}            → Données prêtes à afficher d'une page du front Next.js
+  POST /api/bi/bon-commande          → PDF d'un bon de commande client (page « Passer bon de commande »)
 """
 import logging
 from typing import Literal
@@ -25,14 +26,14 @@ from api.bi.schemas import (
     RapportCARequest, TopClientsRequest, TopArticlesRequest,
     RapportResponse, KpiAnalytiqueResponse, BalanceClientRequest,
     RapportVisiteClientRequest, ValeurStockRequest,
-    RapportConsommationRequest, StatsTiersRequest, RapportRequest, VueRequest,
+    RapportConsommationRequest, StatsTiersRequest, RapportRequest, VueRequest, BonCommandeRequest,
 )
 from api.bi.service import (
     get_dashboard, get_objectifs, get_analytique,
     get_rapport_ca, get_top_clients, get_top_articles,
     get_balance_client, get_rapport_visite, get_valeur_stock,
     get_rapport_consommation, get_balance_agee, get_last_update,
-    get_stats_tiers, get_rapport, get_vue,
+    get_stats_tiers, get_rapport, get_vue, get_bon_commande,
 )
 from api.bi.vues import reservee_directeur
 
@@ -368,7 +369,7 @@ def rapport(
     "/vues/{nom}",
     summary="Données prêtes à afficher d'une page du front (filtrées, totalisées, paginées)",
     description="""
-Vues de `api/bi/vues.py` : `reglements`, `documents`, `document`, `compteurs`, `articles`, `article`, `tiers`,
+Vues de `api/bi/vues.py` : `reglements`, `documents`, `document`, `compteurs`, `articles`, `article`, `tiers`, `clients`,
 `depots`, `familles`, `stock_etat`, `stock_alertes`, `plan_depots`. `filtres` : propres à chaque vue
 (voir les docstrings), `page` pour la pagination (50 lignes). Filtre manquant ou invalide → 400.
 Collaborateur : ses propres documents ; stock, achats et fournisseurs → 403.
@@ -391,4 +392,30 @@ def vue(
         client_schema=req.client_schema,
         req=req,
         nom=nom,
+    )
+
+
+@router.post(
+    "/bon-commande",
+    summary="PDF d'un bon de commande client",
+    description="""
+Bon de commande de la page « Passer bon de commande » (page 9 de Streamlit), au format PDF :
+lignes (référence, quantité, remise %) et remise globale saisies ; prix de vente, désignation et famille
+relus dans Sage ; totaux HT, TVA 20 % et TTC. Rien n'est écrit en base. Client ou article inconnu → 400.
+Directeur et collaborateur (référentiel partagé, aucune donnée d'un autre commercial).
+    """,
+)
+def bon_commande(
+    req: BonCommandeRequest,
+    request: Request,
+    current_user: TokenData = Depends(DIRECTEUR_OU_COLLABORATEUR)
+):
+    return secured_handle(
+        get_bon_commande,
+        partage=True,
+        endpoint="/api/bi/bon-commande",
+        request=request,
+        current_user=current_user,
+        client_schema=req.client_schema,
+        req=req,
     )

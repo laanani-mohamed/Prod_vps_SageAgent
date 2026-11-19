@@ -8,6 +8,7 @@ Architecture miroir du module stock :
   Router → Service (dispatcher) → Use Case → Business Logic + Repository
 """
 from __future__ import annotations
+import json
 import logging
 
 from fastapi import HTTPException, Response
@@ -18,9 +19,10 @@ from api.bi.schemas import (
     RapportCARequest, TopClientsRequest, TopArticlesRequest,
     RapportResponse, KpiAnalytiqueResponse,
     RapportVisiteClientRequest, ValeurStockRequest,
-    RapportConsommationRequest, StatsTiersRequest, RapportRequest, VueRequest,
+    RapportConsommationRequest, StatsTiersRequest, RapportRequest, VueRequest, BonCommandeRequest,
 )
 from api.bi import vues
+from api.common.cache import memo
 from api.bi.use_cases import (
     dashboard_uc,
     objectifs_uc,
@@ -47,7 +49,8 @@ def get_rapport(req: RapportRequest, nom: str, format: str):
     JSON (titre, sections, totaux, répartition) ou fichier PDF / Excel."""
     from reporting.generate import construire   # import local : reporting.generate importe ce module
     try:
-        rapport, filtres = construire(nom, req.client_schema, req.filtres, req.co_no)
+        rapport, filtres = memo(req.client_schema, f"rapport|{nom}|{json.dumps(req.filtres, sort_keys=True, default=str)}|{req.co_no}",
+                                lambda: construire(nom, req.client_schema, req.filtres, req.co_no))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -78,10 +81,20 @@ def get_vue(req: VueRequest, nom: str):
         raise HTTPException(status_code=400, detail=str(e))
 
 
+def get_bon_commande(req: BonCommandeRequest):
+    """PDF d'un bon de commande client (api/bi/vues.bon_commande)."""
+    try:
+        nom, contenu = vues.bon_commande(req.client_schema, req.ct_num, [l.model_dump() for l in req.lignes],
+                                         req.remise_globale, get_last_update(req.client_schema).last_update)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return Response(contenu, media_type=_TYPES_EXPORT["pdf"], headers={"Content-Disposition": f'attachment; filename="{nom}"'})
+
+
 def get_dashboard(req: DashboardRequest) -> DashboardResponse:
     """KPIs du tableau de bord (CA, Achats, Stock, Encours)."""
     logger.info("[BI] dashboard | schema=%s | source=%s", req.client_schema, req.source_type)
-    return dashboard_uc.execute(req)
+    return memo(req.client_schema, f"dashboard|{req.model_dump_json()}", lambda: dashboard_uc.execute(req))
 
 
 def get_last_update(client_schema: str) -> LastUpdateResponse:
@@ -99,7 +112,7 @@ def get_objectifs(client_schema: str) -> ObjectifsResponse:
 def get_analytique(client_schema: str, date_from: str, date_to: str, co_no: list = None) -> KpiAnalytiqueResponse:
     """KPIs analytiques avancés (Marge, DSO, Litige, Retour, Conversion, Top Clients)."""
     logger.info("[BI] analytique | schema=%s | %s → %s", client_schema, date_from, date_to)
-    return analytique_uc.execute(client_schema, date_from, date_to, co_no)
+    return memo(client_schema, f"analytique|{date_from}|{date_to}|{co_no}", lambda: analytique_uc.execute(client_schema, date_from, date_to, co_no))
 
 
 def get_rapport_ca(req: RapportCARequest) -> RapportResponse:

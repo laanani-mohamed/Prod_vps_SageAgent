@@ -160,6 +160,19 @@ class VueRequest(RapportRequest):
     """Données d'une page du front (POST /api/bi/vues/{nom}) : filtres propres à la vue, `page` pour la pagination."""
 
 
+class LigneBonCommande(BaseModel):
+    ar_ref: str = Field(..., min_length=1, description="Référence article (prix, désignation et famille relus dans Sage)")
+    qte: float = Field(..., gt=0, le=1_000_000, description="Quantité commandée")
+    remise_pct: float = Field(0, ge=0, le=100, description="Remise de la ligne, en %")
+
+
+class BonCommandeRequest(BaseBIRequest):
+    """Bon de commande client à imprimer (POST /api/bi/bon-commande) : rien n'est écrit en base."""
+    ct_num: str = Field(..., min_length=1, description="Code du client (F_COMPTET, type 0)")
+    lignes: List[LigneBonCommande] = Field(..., min_length=1, max_length=500)
+    remise_globale: float = Field(0, ge=0, le=100, description="Remise sur le total HT, en %")
+
+
 class TopClientsRequest(BaseBIRequest):
     date_from: Optional[str] = None
     date_to: Optional[str] = None

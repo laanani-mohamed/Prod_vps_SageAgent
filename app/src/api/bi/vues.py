@@ -7,11 +7,14 @@ SQL ; le périmètre co_no d'un collaborateur est imposé par secured_handle ava
 Chaque vue : (schéma, filtres, co_no) → dict JSON ; les listes sont paginées (TAILLE_PAGE lignes).
 """
 from __future__ import annotations
+import re
+from datetime import date, datetime
 
 import pandas as pd
 from fastapi.encoders import jsonable_encoder
 
 from api.bi.repositories.pg_repo.sql_helpers import validate_schema
+from api.common.cache import memo
 from api.db import get_db_connection
 from api.referentiel import service as referentiel
 from api.referentiel.schemas import (
@@ -46,7 +49,9 @@ def _df(reponse) -> pd.DataFrame:
 
 
 def _ref(req, endpoint: str) -> pd.DataFrame:
-    return _df(referentiel.get_specific(req, endpoint=f"/api/referentiel/{endpoint}"))
+    """Table du référentiel pour `req` (en cache jusqu'au prochain ETL ; copie, car les vues modifient leurs colonnes)."""
+    return memo(req.client_schema, f"ref|{endpoint}|{req.model_dump_json()}",
+                lambda: _df(referentiel.get_specific(req, endpoint=f"/api/referentiel/{endpoint}"))).copy()
 
 
 def _num(df: pd.DataFrame, *colonnes) -> pd.DataFrame:
@@ -203,7 +208,10 @@ def compteurs(schema: str, f: dict, co_no: list) -> dict:
 
 
 def articles(schema: str, f: dict, co_no: list) -> dict:
-    req = ArticleDetailRequest(client_schema=schema, with_stock=True, fa_codefamille=[f["famille"]] if f.get("famille") else [])
+    """Articles avec stock, filtrés par famille(s) (`famille`, ou `familles` séparées par des virgules),
+    désignation et référence."""
+    familles = [c for c in str(f.get("familles") or f.get("famille") or "").split(",") if c]
+    req = ArticleDetailRequest(client_schema=schema, with_stock=True, fa_codefamille=familles)
     df = _contient(_contient(_ref(req, "articles/detail"), "ar_design", f.get("design")), "ar_ref", f.get("ref"))
     return _page(df, f.get("page"), ["ar_ref", "ar_design", "fa_codefamille", "fa_intitule", "ar_prixach", "ar_prixven", "qte_stock_totale"], f.get("taille"))
 
@@ -251,9 +259,63 @@ def tiers(schema: str, f: dict, co_no: list) -> dict:
     return _page(df, f.get("page"), ["ct_num", "ct_intitule", "ice", "ct_ville"], f.get("taille"))
 
 
+def clients(schema: str, f: dict, co_no: list) -> dict:
+    """Tous les comptes clients (code, intitulé) : liste de choix du bon de commande."""
+    df = _ref(ComptesTiersRequest(client_schema=schema, ct_type=[0]), "comptes-tiers")
+    if df.empty:
+        return {"clients": []}
+    df = df.sort_values("ct_num")[["ct_num", "ct_intitule"]]
+    return {"clients": df.astype(object).where(df.notna(), None).to_dict("records")}
+
+
+TAUX_TVA = 20.0
+
+
+def bon_commande(schema: str, ct_num: str, lignes: list[dict], remise_globale: float, derniere_maj: str | None) -> tuple[str, bytes]:
+    """PDF d'un bon de commande client (page 9 de Streamlit) : (nom du fichier, contenu).
+    Prix de vente, désignation et famille relus dans Sage ; quantités et remises (%) de la saisie ;
+    totaux HT, TVA et TTC après remise globale. Rien n'est écrit en base."""
+    from reporting.exports import export_df_to_pdf   # import local, comme reporting.generate dans service.py
+
+    tiers = _ref(ComptesTiersRequest(client_schema=schema, ct_type=[0]), "comptes-tiers")
+    client = tiers[tiers["ct_num"] == ct_num] if not tiers.empty else tiers
+    if client.empty:
+        raise ValueError(f"Client {ct_num} introuvable")
+    refs = [l["ar_ref"] for l in lignes]
+    art = _ref(ArticleDetailRequest(client_schema=schema, ar_ref_exact=refs, ar_sommeil=None), "articles/detail")
+    art = _num(art, "ar_prixven").drop_duplicates("ar_ref").set_index("ar_ref") if not art.empty else art
+    manquants = [r for r in refs if r not in art.index]
+    if manquants:
+        raise ValueError(f"Article(s) introuvable(s) : {', '.join(manquants)}")
+
+    df = pd.DataFrame([{
+        "Réf. Famille": art.at[l["ar_ref"], "fa_codefamille"], "Réf. Article": l["ar_ref"],
+        "Désignation": art.at[l["ar_ref"], "ar_design"], "Qté": l["qte"], "PU HT": art.at[l["ar_ref"], "ar_prixven"],
+        "Remise %": l["remise_pct"],
+        "Total HT": art.at[l["ar_ref"], "ar_prixven"] * l["qte"] * (1 - l["remise_pct"] / 100),
+    } for l in lignes])
+    brut = float(df["Total HT"].sum())
+    ht = brut * (1 - remise_globale / 100)
+    ttc = ht * (1 + TAUX_TVA / 100)
+    recap = [[""] * 7]   # ligne vide : détache le récapitulatif des produits
+    if remise_globale > 0:
+        recap.append(["", "", "Remise globale", "", "", remise_globale, -(brut - ht)])
+    recap += [["", "", "TOTAL HT", "", "", "", ht], ["", "", f"TVA {TAUX_TVA:.0f} %", "", "", "", ttc - ht],
+              ["", "", "TOTAL TTC", "", "", "", ttc]]
+    df = pd.concat([df, pd.DataFrame(recap, columns=df.columns)], ignore_index=True)
+
+    jour = date.today().isoformat()
+    maj = f"Derniere mise a jour: {datetime.fromisoformat(derniere_maj).strftime('%d/%m/%Y %H:%M')}" if derniere_maj else ""
+    pdf = export_df_to_pdf(df, title=f"Bon de Commande - {client.iloc[0]['ct_intitule'] or ct_num}",
+                           subtitle=f"Client {ct_num} - Date {jour}", recap_rows=len(recap), derniere_maj=maj)
+    return f"{re.sub(r'[^A-Za-z0-9_-]', '_', ct_num)}_{jour}.pdf", pdf
+
+
 def depots(schema: str, f: dict, co_no: list) -> dict:
     """Dépôts et nombre d'articles distincts référencés dans chacun."""
     df = _ref(StockDepotRequest(client_schema=schema), "stock-depot")
+    if df.empty:   # client sans données : la table n'a même pas de colonnes
+        return {"depots": []}
     g = df.groupby(["de_no", "de_intitule"], dropna=False)["ar_ref"].nunique().reset_index(name="articles")
     return {"depots": g.sort_values("de_no").astype(object).where(g.notna(), None).to_dict("records")}
 
@@ -281,7 +343,10 @@ def familles(schema: str, f: dict, co_no: list) -> dict:
 # ---------------------------------------------------------------------------
 def stock_etat(schema: str, f: dict, co_no: list) -> dict:
     """Stock par article et par dépôt (quantité > 0), du plus valorisé au moins valorisé."""
-    df = _num(_ref(StockDepotRequest(client_schema=schema), "stock-depot"), "as_qtesto", "as_montsto")
+    df = _ref(StockDepotRequest(client_schema=schema), "stock-depot")
+    if df.empty:
+        return {"kpis": {"articles": 0, "quantite": 0.0, "valeur": 0.0, "depots": 0}, "familles": [], **_page(df, 1, [])}
+    df = _num(df, "as_qtesto", "as_montsto")
     nb_depots = int(df["de_no"].nunique())
     df = df[df["as_qtesto"] > 0]
     familles_dispo = (df[["fa_codefamille", "fa_intitule"]].drop_duplicates("fa_codefamille")
@@ -307,7 +372,8 @@ def stock_alertes(schema: str, f: dict, co_no: list) -> dict:
     def lire(t):
         req = StockInsightRequest(client_schema=schema, insight_type=ALERTES[t], dormant_days=mois * 30,
                                   expiry_days=jours, limit=100000000)
-        return pd.DataFrame(jsonable_encoder(stock.get_specific(req, endpoint="/api/stock/insights"))["data"])
+        return memo(schema, f"insight|{req.model_dump_json()}", lambda: pd.DataFrame(
+            jsonable_encoder(stock.get_specific(req, endpoint="/api/stock/insights"))["data"])).copy()
 
     donnees = {t: lire(t) for t in ALERTES}
     df = donnees[choisi]
@@ -330,7 +396,10 @@ def plan_depots(schema: str, f: dict, co_no: list) -> dict:
     from api.bi.schemas import ValeurStockRequest
     from api.bi.service import get_valeur_stock   # import local : api.bi.service importe ce module
 
-    df = _num(_df(get_valeur_stock(ValeurStockRequest(client_schema=schema))), "qte_stock", "valeur_stock")
+    df = memo(schema, "valeur_stock", lambda: _df(get_valeur_stock(ValeurStockRequest(client_schema=schema)))).copy()
+    if df.empty:
+        return {"totaux": {"depots": len(_noms_depots(schema)), "valeur": 0.0, "quantite": 0.0, "articles": 0}, "depots": []}
+    df = _num(df, "qte_stock", "valeur_stock")
 
     def resume(g):
         return {"valeur": float(g["valeur_stock"].sum()), "quantite": float(g["qte_stock"].sum()), "articles": int(g["ar_ref"].nunique())}
@@ -349,7 +418,8 @@ def plan_depots(schema: str, f: dict, co_no: list) -> dict:
 
 VUES = {
     "reglements": reglements, "documents": documents, "document": document,
-    "compteurs": compteurs, "articles": articles, "article": article, "tiers": tiers, "depots": depots, "familles": familles,
+    "compteurs": compteurs, "articles": articles, "article": article, "tiers": tiers, "clients": clients,
+    "depots": depots, "familles": familles,
     "stock_etat": stock_etat, "stock_alertes": stock_alertes, "plan_depots": plan_depots,
 }
 
