@@ -20,42 +20,20 @@ body { margin: 0; background: var(--fond); color: var(--texte); }
 .principal:disabled { opacity: 0.7; cursor: progress; }
 
 /* ---------- Connexion : règles limitées à la page (.connexion), pour ne pas déborder sur les autres ---------- */
-.connexion { position: relative; min-height: 100vh; display: flex; overflow: hidden; background: #f6f7f9; }
-.connexion .marque { display: flex; align-items: center; gap: 12px; font-weight: 800; font-size: 22px; letter-spacing: -0.5px; }
+/* Fond : photo d'entrepôt (public/connexion-fond.webp) sous un voile sombre léger */
+.connexion { position: relative; min-height: 100vh; display: flex; overflow: hidden; background: #2a2f36 url('/connexion-fond.webp') center / cover no-repeat; }
+.connexion::before { content: ''; position: absolute; inset: 0; background: rgb(12 14 18 / 28%); }
+.connexion .marque { display: flex; align-items: center; gap: 12px; font-weight: 800; font-size: 22px; letter-spacing: -0.5px; color: #fff; text-shadow: 0 2px 12px rgb(0 0 0 / 50%); }
 .connexion .logo {
-  width: 40px; height: 40px; border-radius: 10px; background: var(--texte); color: #fff;
+  width: 40px; height: 40px; border-radius: 10px; background: #f08c00; color: #1c1410; text-shadow: none;
   display: grid; place-items: center; font-size: 16px;
 }
-/* Fond : motifs de statistiques en dégradé noir → gris (décor, sous le formulaire) */
-.connexion .points { position: absolute; inset: 0; background-image: radial-gradient(#d4d4d8 1px, transparent 1.2px); background-size: 26px 26px; }
-.connexion .motif { position: absolute; opacity: 0.6; pointer-events: none; }
-.connexion .m-histo { left: 4%; top: 6%; animation: flotte 9s ease-in-out infinite; }
-.connexion .m-anneau { right: 5%; top: 4%; }
-.connexion .m-courbe { left: calc(50% - 110px); top: 5%; }
-.connexion .m-nuage { left: 4.5%; top: 40%; animation: flotte 9s ease-in-out -3s infinite; }
-.connexion .m-tableau { right: 3.5%; top: 42%; width: 330px; display: flex; flex-direction: column; animation: flotte 9s ease-in-out -6s infinite; }
-.connexion .m-tableau .rang { display: grid; grid-template-columns: 18px 96px minmax(0, 1fr) 44px; gap: 12px; align-items: center; padding: 11px 0; border-bottom: 1px solid var(--bord); }
-.connexion .m-tableau .entete { padding-top: 0; border-bottom: 1.5px solid #a1a1aa; }
-.connexion .m-tableau .rang:nth-last-child(2) { border-bottom: 0; }
-.connexion .m-tableau span { width: 18px; height: 18px; border-radius: 5px; }
-.connexion .m-tableau i { display: block; height: 7px; border-radius: 999px; background: #d4d4d8; }
-.connexion .m-tableau .entete i { background: #a1a1aa; }
-.connexion .m-tableau .piste-motif { background: var(--bord); }
-.connexion .m-tableau b { display: block; height: 7px; border-radius: 999px; }
-.connexion .m-tableau .empile { margin-top: 18px; display: flex; flex-direction: column; gap: 8px; }
-.connexion .m-tableau .empile div { display: flex; height: 14px; border-radius: 5px; overflow: hidden; }
-.connexion .m-tableau .empile span { width: auto; height: auto; border-radius: 0; }
-.connexion .m-plus { width: 18px; height: 18px; }
-.connexion .pousse { transform-box: fill-box; transform-origin: bottom; animation: pousse 0.9s cubic-bezier(.2, .8, .2, 1) backwards; }
-.connexion .lent { transform-box: fill-box; transform-origin: center; animation: tourne 60s linear infinite; }
-@keyframes pousse { from { transform: scaleY(0); } }
 @keyframes monte { from { opacity: 0; transform: translateY(16px); } }
-@keyframes flotte { 50% { transform: translateY(-8px); } }
 
 .connexion .formulaire { position: relative; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; padding: 40px 16px; }
 .connexion .carte {
   width: 100%; max-width: 420px; padding: 36px; border-radius: 16px;
-  background: var(--carte); border: 1px solid var(--bord); box-shadow: 0 24px 60px rgb(9 9 11 / 10%);
+  background: var(--carte); border: 1px solid var(--bord); box-shadow: 0 30px 80px rgb(0 0 0 / 45%);
   animation: monte 0.6s cubic-bezier(.2, .8, .2, 1) backwards;
 }
 .connexion .carte h1 { margin: 0; font-size: 24px; letter-spacing: -0.4px; }
@@ -81,16 +59,14 @@ body { margin: 0; background: var(--fond); color: var(--texte); }
   background: none; color: var(--doux); display: grid; place-items: center; cursor: pointer;
 }
 .connexion .oeil:hover { background: var(--gris); }
-.connexion .principal { margin-top: 16px; }
+.connexion .principal { margin-top: 16px; background: #f08c00; color: #1c1410; }
+.connexion .principal:hover { background: #d97a00; }
 .connexion .pied {
   margin: 0; display: flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 999px;
-  background: rgb(255 255 255 / 90%); border: 1px solid var(--bord); font-size: 13px; color: var(--doux);
+  background: rgb(20 23 27 / 72%); border: 1px solid rgb(255 255 255 / 15%); font-size: 13px; color: #f4f4f5;
 }
 
-@media (max-width: 1180px) { .connexion .m-cote { display: none; } }   /* motifs latéraux : place pour le formulaire */
-@media (max-height: 760px) { .connexion .m-courbe { display: none; } }
-@media (max-width: 700px), (max-height: 600px) { .connexion .motif { display: none; } }
-@media (prefers-reduced-motion: reduce) { .connexion .motif, .connexion .pousse, .connexion .lent, .connexion .carte { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .connexion .carte { animation: none; } }
 
 /* ---------- Thèmes des sections (palettes des maquettes) ---------- */
 .theme-ardoise { --fond: #fafafa; --bord: #e4e4e7; --gris: #f4f4f5; --texte: #09090b; --doux: #52525b; --accent: #2a78d6; --sur-accent: #fff; }
