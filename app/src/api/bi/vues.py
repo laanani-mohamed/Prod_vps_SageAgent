@@ -391,29 +391,34 @@ def stock_alertes(schema: str, f: dict, co_no: list) -> dict:
 
 
 def plan_depots(schema: str, f: dict, co_no: list) -> dict:
-    """Plan des dépôts : valeur, quantité et articles par dépôt, ses 6 premières familles (en quantité)
-    et les 5 premiers articles de chacune."""
+    """Plan des dépôts : pour chaque dépôt et pour tout le stock (`tous`, sans regroupement par dépôt) :
+    valeur, quantité, articles, ses 6 premières familles (en quantité) et les 5 articles les plus stockés de chacune
+    (quantités et valeurs d'un même article additionnées sur ses dépôts)."""
     from api.bi.schemas import ValeurStockRequest
     from api.bi.service import get_valeur_stock   # import local : api.bi.service importe ce module
 
+    nb_depots = len(_noms_depots(schema))
     df = memo(schema, "valeur_stock", lambda: _df(get_valeur_stock(ValeurStockRequest(client_schema=schema)))).copy()
     if df.empty:
-        return {"totaux": {"depots": len(_noms_depots(schema)), "valeur": 0.0, "quantite": 0.0, "articles": 0}, "depots": []}
+        vide = {"valeur": 0.0, "quantite": 0.0, "articles": 0}
+        return {"totaux": {"depots": nb_depots, **vide}, "tous": {"no": 0, "nom": "Tous les dépôts", **vide, "nb_familles": 0, "familles": []}, "depots": []}
     df = _num(df, "qte_stock", "valeur_stock")
 
     def resume(g):
         return {"valeur": float(g["valeur_stock"].sum()), "quantite": float(g["qte_stock"].sum()), "articles": int(g["ar_ref"].nunique())}
 
-    resultat = []
-    for (no, nom), d in df.groupby(["de_no", "de_intitule"], dropna=False):
+    def detail(no, nom, d):
         fams = []
         for (code, intitule), g in d.groupby(["fa_codefamille", "fa_intitule"], dropna=False):
-            top = g.sort_values("qte_stock", ascending=False).head(5)
-            fams.append({"code": code, "nom": intitule, **resume(g),
-                         "top": top[["ar_ref", "ar_design", "qte_stock", "valeur_stock"]].to_dict("records")})
+            top = (g.groupby(["ar_ref", "ar_design"], dropna=False)[["qte_stock", "valeur_stock"]].sum()
+                   .reset_index().sort_values("qte_stock", ascending=False).head(5))
+            fams.append({"code": code, "nom": intitule, **resume(g), "top": top.to_dict("records")})
         fams.sort(key=lambda x: -x["quantite"])
-        resultat.append({"no": int(no), "nom": nom, **resume(d), "nb_familles": len(fams), "familles": fams[:6]})
-    return {"totaux": {"depots": len(_noms_depots(schema)), **resume(df)}, "depots": sorted(resultat, key=lambda x: -x["valeur"])}
+        return {"no": int(no), "nom": nom, **resume(d), "nb_familles": len(fams), "familles": fams[:6]}
+
+    depots = [detail(no, nom, d) for (no, nom), d in df.groupby(["de_no", "de_intitule"], dropna=False)]
+    return {"totaux": {"depots": nb_depots, **resume(df)}, "tous": detail(0, "Tous les dépôts", df),
+            "depots": sorted(depots, key=lambda x: -x["valeur"])}
 
 
 VUES = {

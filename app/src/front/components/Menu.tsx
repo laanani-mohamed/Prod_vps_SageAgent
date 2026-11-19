@@ -13,7 +13,7 @@ const PAGES = [
   { nom: 'Fichier de Base', href: '/fichier-de-base/articles', base: '/fichier-de-base', icone: 'M4 5h16v14H4zM4 9h16' },
   { nom: 'Gestion Ventes', href: '/ventes', base: '/ventes', icone: 'M3 12h18M15 6l6 6-6 6' },
   { nom: 'Gestion Achats', href: '/achats', base: '/achats', icone: 'M21 12H3M9 6l-6 6 6 6', directeur: true },
-  { nom: 'Stock & Mouvements', href: '/stock/etat', base: '/stock', icone: 'M21 8l-9-5-9 5 9 5zM3 8v8l9 5 9-5V8', directeur: true },
+  { nom: 'Stock & Mouvements', href: '/stock/plan', base: '/stock', icone: 'M21 8l-9-5-9 5 9 5zM3 8v8l9 5 9-5V8', directeur: true },
   { nom: 'Règlements', href: '/reglements/encaissements', base: '/reglements', icone: 'M2 6h20v12H2zM12 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4z' },
 ]
 const INTERDIT = '🚫'
