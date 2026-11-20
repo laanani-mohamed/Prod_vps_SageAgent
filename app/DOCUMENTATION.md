@@ -37,7 +37,7 @@ L'application `app/` contient **6 briques**, qui partagent la même configuratio
 | Brique | Dossier | Techno | Rôle | Lancement |
 |---|---|---|---|---|
 | **ETL** | `src/etl/` | Python, Polars, psycopg2 | Surveille les dépôts SFTP des clients, valide les fichiers et les charge dans PostgreSQL | service `SageAgent_etl` |
-| **API BI** | `src/api/` | FastAPI, Uvicorn | Expose les données (stock, référentiel, transactions, KPIs, rapports), protégée par JWT | service `SageAgent_api` (port 8000) |
+| **API BI** | `src/api/` | FastAPI, Uvicorn | Expose les données (stock, référentiel, transactions, KPIs, rapports), protégée par JWT | service `SageAgent_api` (`127.0.0.1:8000` seulement : appelée par le front et Hermes) |
 | **Dashboard BI « ITBORD »** | `src/dashboard_bi/` | Streamlit, Plotly | Interface des clients finaux : tableau de bord, fichiers de base, ventes/achats, stock, règlements, rapports | `SageAgent_dashbi` (8505) ou une instance par client `sageagent-dashbi@<client>` (8506 à 8511) — **arrêtés et désactivés depuis le 20/11/2026**, remplacés par le front (partie 10.8) |
 | **Front ITBORD (nouveaux dashboards)** | `src/front/` | Next.js 16, React 19, TypeScript | Remplaçant du Dashboard BI : connexion, tableau de bord, fichier de base, ventes, achats, stock (+ plan des dépôts), règlements, les 9 rapports, « Passer bon de commande » (panier gardé dans le navigateur, PDF par l'API) et « Dépôt des fichiers » (directeur : envoi des 11 exports Sage au traitement ETL et suivi du chargement). Le navigateur ne parle qu'au front, qui appelle l'API côté serveur (jetons dans des cookies httpOnly) ; filtres et sélections dans l'URL, aucun calcul métier dans le front | service `SageAgent_front` (`127.0.0.1:8504` seulement), public sur **https://itbord.ma** (nginx + Let's Encrypt) |
 | **Dashboard Ops** | `src/dashboard_ops/` | Streamlit | Outil **interne** : suivi des runs ETL, investigation d'erreurs, état des services, journal d'accès API, onboarding de nouveaux clients | service `SageAgent_dashops` (`127.0.0.1:8585`, chemin `/tech`), en ligne sur **https://itbord.ma/tech** (protégé par son mot de passe) |
@@ -140,7 +140,7 @@ API dont `allowed_schemas` contient ce schéma. Clients actuels : `cross`, `rous
 .venv/bin/python src/etl/orchestration/main.py
 
 # API (Swagger : http://localhost:8000/docs)
-.venv/bin/uvicorn api.main:app --app-dir src --host 0.0.0.0 --port 8000
+.venv/bin/uvicorn api.main:app --app-dir src --host 127.0.0.1 --port 8000   # local seulement (service SageAgent_api)
 
 # Dashboard BI (instance unique)
 cd src/dashboard_bi && ../../.venv/bin/python -m streamlit run app.py --server.port 8505
@@ -717,7 +717,7 @@ supprimé depuis. `reporting` importe directement les `service.py` de l'API.
 | Dossier (`/opt/SageAgent/…`) | Rôle |
 |---|---|
 | `storage_srv/` (non versionné) | `upload/<CLIENT>/` (dépôts SFTP, bind mount de `/var/sftp/upload`), `queue/` (file d'attente de l'ETL), `broker_queue/` (ancienne file, vide), `archives/<CLIENT>/<date>/` (succès, sert aussi de snapshots à l'API), `error/<CLIENT>/<date>/` (échecs), `events/events.jsonl` (repli de l'event store), `rapport/<CLIENT>/<date>/` (rapports générés). |
-| `service/` | Unités systemd à copier dans `/etc/systemd/system/` (mode d'emploi en bas de chaque fichier) : `SageAgent_etl`, `SageAgent_api` (port 8000), `SageAgent_front` (`127.0.0.1:8504`, nouveaux dashboards Next.js), `SageAgent_dashops` (Dashboard Ops, `127.0.0.1:8585`, chemin `/tech`), `SageAgent_dashbi` (port 8505, instance unique), `sageagent-dashbi@` (une instance par client, port lu dans `/etc/sageagent/clients/<client>.env`, modèles dans `service/clients/*.env`), `SageAgent_rapports` + `.timer` (oneshot à 07:00, heure de `Africa/Casablanca`, `Persistent=true`), `sudoers-sftp-onboard` (permet à l'utilisateur du Dashboard Ops de lancer **uniquement** `sftp_onboard.sh` en root). |
+| `service/` | Unités systemd à copier dans `/etc/systemd/system/` (mode d'emploi en bas de chaque fichier) : `SageAgent_etl`, `SageAgent_api` (`127.0.0.1:8000`), `SageAgent_front` (`127.0.0.1:8504`, nouveaux dashboards Next.js), `SageAgent_dashops` (Dashboard Ops, `127.0.0.1:8585`, chemin `/tech`), `SageAgent_dashbi` (port 8505, instance unique), `sageagent-dashbi@` (une instance par client, port lu dans `/etc/sageagent/clients/<client>.env`, modèles dans `service/clients/*.env`), `SageAgent_rapports` + `.timer` (oneshot à 07:00, heure de `Africa/Casablanca`, `Persistent=true`), `sudoers-sftp-onboard` (permet à l'utilisateur du Dashboard Ops de lancer **uniquement** `sftp_onboard.sh` en root). |
 | `nginx/` | Reverse proxy : `<client>.sageagent.test` → port local de l'instance du client (`map $host $sageagent_port` dans `sageagent_clients.conf`), HTTP → HTTPS. `README.md` explique les notions et la configuration ; `docs/nginx/` décrit les phases 1 (domaine de test) et 2 (vrai domaine). `itbord_ma.conf` : **https://itbord.ma** → front Next.js (`127.0.0.1:8504`), corps limité à 20 Mo sauf `/depot/api/fichiers/` (2 Go, en flux), et `/tech` → Dashboard Ops (`127.0.0.1:8585`, WebSocket), certificat Let's Encrypt renouvelé par `certbot.timer` (démarche, dossiers créés et renouvellement : partie 10). |
 | `certs/` | Clés RSA de signature des JWT (`private.pem`, `public.pem`). |
 | `data_Client/reference/` | `auth.json` : **registre des clients** (clé client → schéma, identifiant, rôle, port du dashboard), lu par `reporting/generate.py` et le Dashboard Ops. Description des tables Sage (`.md`, `.xlsx`, `db_struct.txt`). |
@@ -725,7 +725,7 @@ supprimé depuis. `reporting` importe directement les `service.py` de l'API.
 | `hermes/`, `hermes-docker/` | Agent IA externe (Hermes, Nous Research) en Docker, et documentation de ses outils API (`TOOLS_API.md`). Il consomme l'API via `/telegram`. Indépendant de `app/`. |
 | `.claude/graphify-out/` | Graphe de dépendances (partie 6). |
 
-**Ports utilisés** : nginx 80/443 (`itbord.ma`) · Front 8504 (local seulement, public par `itbord.ma`) · API 8000 · Dashboard Ops 8585 (local seulement, public par `itbord.ma/tech`) ·
+**Ports utilisés** : nginx 80/443 (`itbord.ma`) · Front 8504 (local seulement, public par `itbord.ma`) · API 8000 (local seulement) · Dashboard Ops 8585 (local seulement, public par `itbord.ma/tech`) ·
 Redis 6379 · PostgreSQL 5432. Libérés le 20/11/2026 (Streamlit arrêté, partie 10.8) : Dashboard BI 8505 et,
 par client, cross 8506, rousseau 8507, mms 8508, muliparts 8509, client_01 8510, health 8511.
 
@@ -744,7 +744,8 @@ Constatés à la lecture du code. À traiter avant ou pendant la reprise du proj
    toutes ces valeurs** et ajouter ces fichiers au `.gitignore`.
 2. **Sous-application `/telegram` sans authentification** : elle donne accès à toutes les
    données de tous les clients, sans limite de débit. Le code prévoit un secret en en-tête mais
-   ne le vérifie pas. Il faut au minimum restreindre son accès réseau.
+   ne le vérifie pas. Depuis le 20/11/2026, l'API n'écoute plus qu'en local (partie 10.8) :
+   `/telegram` n'est plus joignable depuis Internet, mais reste ouvert à tout programme du serveur.
 3. Le `REDIS_HOST` et les `ALLOWED_ORIGINS` contiennent une IP publique en dur
    (`api/auth/config.py`) : il vaut mieux les définir par variable d'environnement.
 
@@ -990,9 +991,12 @@ son renouvellement).
 
 ### 10.8 Ce qui reste à faire
 
-- [ ] **Fermer l'API au public** : `SageAgent_api` écoute sur `0.0.0.0:8000`, et `/telegram/` n'a
-      aucune authentification (partie 8, sécurité, point 2). Passer `--host 127.0.0.1` : tous les
-      appelants internes (front, dashboard_ops, hermes) utilisent `localhost`.
+- [x] **API fermée au public** (fait le 20/11/2026) : `SageAgent_api` lancé avec `--host 127.0.0.1` ;
+      `http://<IP>:8000` ne répond plus (il était sondé chaque jour par des robots). Appelants, tous en
+      local : le front (`API_URL`) et Hermes (`API_BASE_URL` dans `~/.hermes/plugins/zoo_api/__init__.py`,
+      passé de l'IP publique à `127.0.0.1`). `/telegram/*` est conservé tel quel (Hermes s'en sert) : il
+      reste sans authentification, mais seulement pour les programmes du serveur. Swagger : tunnel SSH
+      `ssh -L 8000:127.0.0.1:8000 <utilisateur>@51.255.161.55`, puis `http://localhost:8000/docs`.
 - [x] **Front en local** (fait le 20/11/2026) : `SageAgent_front` lancé avec `-H 127.0.0.1` ; accès public
       uniquement par **https://itbord.ma**, `http://<IP>:8504` ne répond plus.
 - [ ] Pare-feu : `sudo ufw allow OpenSSH` (en premier), `sudo ufw allow 'Nginx Full'`, `sudo ufw enable`

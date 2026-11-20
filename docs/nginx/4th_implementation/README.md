@@ -165,9 +165,12 @@ son renouvellement).
 
 ## 8. Ce qui reste à faire
 
-- [ ] **Fermer l'API au public** : `SageAgent_api` écoute sur `0.0.0.0:8000`, et `/telegram/` n'a
-      aucune authentification (toutes les données de tous les clients). Passer `--host 127.0.0.1`
-      (tous les appelants internes — front, Streamlit, dashboard_ops, hermes — utilisent `localhost`).
+- [x] **API fermée au public** (fait le 20/11/2026) : `SageAgent_api` lancé avec `--host 127.0.0.1` ;
+      `http://<IP>:8000` ne répond plus (il était sondé chaque jour par des robots). Appelants, tous en
+      local : le front (`API_URL`) et Hermes (`API_BASE_URL` dans `~/.hermes/plugins/zoo_api/__init__.py`,
+      passé de l'IP publique à `127.0.0.1`). `/telegram/*` est conservé tel quel (Hermes s'en sert) : il
+      reste sans authentification, mais seulement pour les programmes du serveur. Swagger : tunnel SSH
+      `ssh -L 8000:127.0.0.1:8000 <utilisateur>@51.255.161.55`, puis `http://localhost:8000/docs`.
 - [x] **Front en local** (fait le 20/11/2026) : `SageAgent_front` lancé avec `-H 127.0.0.1` ; accès public
       uniquement par **https://itbord.ma**, `http://<IP>:8504` ne répond plus.
 - [ ] Pare-feu : `sudo ufw allow OpenSSH` (en premier), `sudo ufw allow 'Nginx Full'`, `sudo ufw enable`

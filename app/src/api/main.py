@@ -1,7 +1,7 @@
 """
 api/main.py — Point d'entrée de l'API BI FastAPI.
 Lancement :
-./venv/bin/uvicorn api.main:app --app-dir src --reload --host 0.0.0.0 --port 8000
+.venv/bin/uvicorn api.main:app --app-dir src --reload --host 127.0.0.1 --port 8000   (en service : SageAgent_api, local seulement)
 
 Docs Swagger disponibles sur :
   http://localhost:8000/docs
