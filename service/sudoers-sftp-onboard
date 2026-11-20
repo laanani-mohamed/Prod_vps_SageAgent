@@ -11,8 +11,8 @@
 #   sudo -n SFTP_PASSWORD=test /opt/SageAgent/app/utils/client_sftp/sftp_onboard.sh --help
 #   -> ne doit PAS demander de mot de passe (peut afficher l'usage du script, c'est normal)
 #
-# IMPORTANT : si dashboard_ops est un jour migre vers un service systemd tournant
-# sous un autre utilisateur (ex: "ubuntu", comme les autres services SageAgent),
-# cette regle doit etre mise a jour pour cibler ce nouvel utilisateur.
+# IMPORTANT : dashboard_ops tourne dans le service systemd SageAgent_dashops
+# (service/SageAgent_dashops) sous amohamed. Si cet utilisateur change, cette regle
+# doit etre mise a jour pour cibler le nouvel utilisateur.
 
 amohamed ALL=(root) NOPASSWD:SETENV: /opt/SageAgent/app/utils/client_sftp/sftp_onboard.sh

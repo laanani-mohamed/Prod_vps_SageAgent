@@ -21,6 +21,7 @@
 7. [Autour de `app/` : dossiers du projet](#7-autour-de-app--dossiers-du-projet)
 8. [Points d'attention et dette connue](#8-points-dattention-et-dette-connue)
 9. [Recettes : tâches courantes](#9-recettes--tâches-courantes)
+10. [Mise en ligne : domaine `itbord.ma` et certificat SSL](#10-mise-en-ligne--domaine-itbordma-et-certificat-ssl)
 
 ---
 
@@ -37,9 +38,9 @@ L'application `app/` contient **6 briques**, qui partagent la même configuratio
 |---|---|---|---|---|
 | **ETL** | `src/etl/` | Python, Polars, psycopg2 | Surveille les dépôts SFTP des clients, valide les fichiers et les charge dans PostgreSQL | service `SageAgent_etl` |
 | **API BI** | `src/api/` | FastAPI, Uvicorn | Expose les données (stock, référentiel, transactions, KPIs, rapports), protégée par JWT | service `SageAgent_api` (port 8000) |
-| **Dashboard BI « ITBORD »** | `src/dashboard_bi/` | Streamlit, Plotly | Interface des clients finaux : tableau de bord, fichiers de base, ventes/achats, stock, règlements, rapports | `SageAgent_dashbi` (8505) ou une instance par client `sageagent-dashbi@<client>` (8506 à 8511) |
-| **Front ITBORD (nouveaux dashboards)** | `src/front/` | Next.js 16, React 19, TypeScript | Remplaçant du Dashboard BI : connexion, tableau de bord, fichier de base, ventes, achats, stock (+ plan des dépôts), règlements, les 9 rapports et « Passer bon de commande » (panier gardé dans le navigateur, PDF par l'API). Le navigateur ne parle qu'au front, qui appelle l'API côté serveur (jetons dans des cookies httpOnly) ; filtres et sélections dans l'URL, aucun calcul métier dans le front | service `SageAgent_front` (port 8504) |
-| **Dashboard Ops** | `src/dashboard_ops/` | Streamlit | Outil **interne** : suivi des runs ETL, investigation d'erreurs, état des services, journal d'accès API, onboarding de nouveaux clients | lancement manuel (port 8585) |
+| **Dashboard BI « ITBORD »** | `src/dashboard_bi/` | Streamlit, Plotly | Interface des clients finaux : tableau de bord, fichiers de base, ventes/achats, stock, règlements, rapports | `SageAgent_dashbi` (8505) ou une instance par client `sageagent-dashbi@<client>` (8506 à 8511) — **arrêtés et désactivés depuis le 20/11/2026**, remplacés par le front (partie 10.8) |
+| **Front ITBORD (nouveaux dashboards)** | `src/front/` | Next.js 16, React 19, TypeScript | Remplaçant du Dashboard BI : connexion, tableau de bord, fichier de base, ventes, achats, stock (+ plan des dépôts), règlements, les 9 rapports, « Passer bon de commande » (panier gardé dans le navigateur, PDF par l'API) et « Dépôt des fichiers » (directeur : envoi des 11 exports Sage au traitement ETL et suivi du chargement). Le navigateur ne parle qu'au front, qui appelle l'API côté serveur (jetons dans des cookies httpOnly) ; filtres et sélections dans l'URL, aucun calcul métier dans le front | service `SageAgent_front` (`127.0.0.1:8504` seulement), public sur **https://itbord.ma** (nginx + Let's Encrypt) |
+| **Dashboard Ops** | `src/dashboard_ops/` | Streamlit | Outil **interne** : suivi des runs ETL, investigation d'erreurs, état des services, journal d'accès API, onboarding de nouveaux clients | service `SageAgent_dashops` (`127.0.0.1:8585`, chemin `/tech`), en ligne sur **https://itbord.ma/tech** (protégé par son mot de passe) |
 | **Rapports planifiés** | `src/reporting/` | pandas, fpdf, openpyxl, SMTP | Génère les rapports PDF/Excel de chaque client et les envoie par email | `SageAgent_rapports.timer` (tous les jours à 07:00, heure du Maroc), fourni dans `service/` mais **pas encore installé** |
 
 **Multi-client (« multi-tenant »)** : un client = un dossier SFTP `storage_srv/upload/<CLIENT>/`
@@ -85,6 +86,9 @@ API dont `allowed_schemas` contient ce schéma. Clients actuels : `cross`, `rous
 
 ### Le cycle de vie d'un dépôt client (ETL)
 
+0. **Dépôt** : par SFTP (chroot du client), ou depuis la page « Dépôt des fichiers » du front (directeur) :
+   les fichiers y attendent dans `upload/<CLIENT>/.depot_web/` (caché, ignoré par l'ETL), puis le bouton
+   « Envoyer » les déplace d'un coup dans `upload/<CLIENT>/` (`api/depot/router.py`). La suite est identique.
 1. **Détection** (`watcher.py`, toutes les 15 s) : un dossier `upload/<CLIENT>/` est « prêt » quand
    ses fichiers n'ont pas bougé depuis 5 s **et** qu'il contient exactement 11 fichiers.
    Plus de 11 → rejet `TOO_MANY_FILES`. Moins de 11 depuis plus de 10 min → rejet `TIMEOUT`.
@@ -144,10 +148,10 @@ cd src/dashboard_bi && ../../.venv/bin/python -m streamlit run app.py --server.p
 .venv/bin/streamlit run src/dashboard_bi/app.py --server.port=8506 --server.address=127.0.0.1
 
 # Front Next.js (Node 22 : /home/amohamed/.hermes/node/bin dans le PATH)
-cd src/front && npm ci && npm run build && npm start      # http://<IP>:8504 ; développement : npm run dev
+cd src/front && npm ci && npm run build && npm start      # service : 127.0.0.1:8504 seulement, public par https://itbord.ma ; développement : npm run dev
 
-# Dashboard Ops (interne)
-nohup .venv/bin/streamlit run src/dashboard_ops/app.py --server.port 8585 --server.headless true > /tmp/dashboard_ops.log 2>&1 &
+# Dashboard Ops (interne) : service systemd, https://itbord.ma/tech (127.0.0.1:8585 seulement)
+sudo systemctl restart SageAgent_dashops      # après une modification de src/dashboard_ops
 
 # Rapports (génération et envoi immédiats)
 .venv/bin/python src/reporting/generate.py
@@ -394,7 +398,7 @@ Toutes les requêtes métier portent un `client_schema` (validé par l'expressio
 | Fichier | Rôle | Caractéristiques |
 |---|---|---|
 | `__init__.py` | Package | Vide. |
-| `main.py` | **Point d'entrée** de l'API | Ajoute `src/` et `app/` au `sys.path`. Au démarrage (`lifespan`), ouvre le pool de connexions et le thread d'audit ; il les ferme à l'arrêt. Configure CORS (`ALLOWED_ORIGINS`), le limiteur slowapi et les routeurs `auth`, `stock`, `transactions`, `referentiel`, `bi`. Monte une **sous-application `/telegram`** qui reprend les mêmes routeurs **sans JWT** (utilisateur fictif `telegram_agent`, tous les schémas). Expose `GET /` (liste d'endpoints, en partie obsolète) et `GET /health`. Swagger : `/docs`, ReDoc : `/redoc`. |
+| `main.py` | **Point d'entrée** de l'API | Ajoute `src/` et `app/` au `sys.path`. Au démarrage (`lifespan`), ouvre le pool de connexions et le thread d'audit ; il les ferme à l'arrêt. Configure CORS (`ALLOWED_ORIGINS`), le limiteur slowapi et les routeurs `auth`, `stock`, `transactions`, `referentiel`, `bi`, `depot` (ce dernier hors sous-application Telegram). Monte une **sous-application `/telegram`** qui reprend les mêmes routeurs **sans JWT** (utilisateur fictif `telegram_agent`, tous les schémas). Expose `GET /` (liste d'endpoints, en partie obsolète) et `GET /health`. Swagger : `/docs`, ReDoc : `/redoc`. |
 | `db.py` | Pool de connexions PostgreSQL | `ThreadedConnectionPool` (1 à 20 connexions). `get_db()` est une dépendance FastAPI ; `get_db_connection()` est un gestionnaire de contexte pour les repositories (`rollback` automatique en cas d'erreur). |
 | `_base_router.py` | Garde commune à tous les endpoints métier | `secured_handle(service_func, endpoint, request, current_user, client_schema, …)` : contrôle d'accès au schéma (403 et audit `ACCESS_DENIED`), injection de `client_schema` et `endpoint` si la fonction les attend, audit `API_CALL` avec la durée, et traduction des erreurs (`FileNotFoundError` → 404, toute autre erreur → 500 générique). |
 | `rate_limiter.py` | Limitation de débit | slowapi. La clé est l'IP réelle (`CF-Connecting-IP` > `X-Forwarded-For` > `X-Real-IP` > IP directe). Les appels `/telegram` reçoivent une clé aléatoire, ce qui les exempte de la limite. |
@@ -462,6 +466,19 @@ Endpoints (tous `analyst`) :
 | `repositories/pg_repo/bi_*_repo.py` | Requêtes SQL par rapport | `bi_dashboard_repo`, `bi_analytique_repo`, `bi_rapport_ca_repo` (+ tiers et collaborateur), `bi_top_clients_repo`, `bi_top_articles_repo`, `bi_balance_repo` (factures + tiers, commercial de la pièce), `bi_visite_client_repo` (7 jeux de données d'un `do_tiers`), `bi_valeur_stock_repo`, `bi_consommation_repo`, `bi_stats_tiers_repo` (une méthode par jeu de données). |
 | `repositories/archive_repo/base_bi_archive.py` | Accès aux archives pour la BI | `get_bi_archive_dir`, `find_bi_snapshot`, `load_bi_table`, `safe_float_col`. S'appuie sur le loader du module référentiel. |
 | `repositories/archive_repo/bi_*_archive.py` | Variantes « archive » | Pour dashboard, analytique, rapport CA, top clients, top articles. |
+
+#### `src/api/depot/` — Dépôt des fichiers Sage (`/api/depot`, directeur seul)
+
+Un seul fichier, `router.py`. Branche la page « Dépôt des fichiers » du front sur le circuit SFTP existant, sans
+modifier l'ETL. Dossier du client = dossier de `upload/` dont le nom en minuscules est le schéma (`CROSS` → `cross`).
+
+| Endpoint | Ce qu'il fait |
+|---|---|
+| `GET /etat` | Fichiers reçus en attente (`upload/<CLIENT>/.depot_web/`, supprimés après 24 h), nombre de fichiers dans le dossier SFTP, dossier en file d'attente (`queue/<CLIENT>__*`), dernier chargement lu dans `etl_events.pipeline_events` : statut, heure de chaque étape (prise en charge, contrôle, chargement, terminé), étape en échec et détail de l'erreur (fichier, ligne, colonne, problème, que faire) relu dans le rapport `ERREUR_*.txt` de ce `run_id`. Date du dernier chargement réussi. |
+| `PUT /fichiers/{nom}` | Reçoit un fichier en flux (corps brut, 2 Go max). Seul le nom est contrôlé : l'un des 11 de `FILE_TABLE_MAP`, casse libre, enregistré sous le nom attendu. Jeton et nom vérifiés avant la lecture du corps. |
+| `DELETE /fichiers/{nom}` | Retire un fichier reçu. |
+| `POST /envoyer` | Exige les 11 fichiers, un dossier SFTP vide (409 sinon : dépôt SFTP en cours) et aucun dossier en file d'attente (409). Déplace les 11 fichiers (rename, même montage) dans `upload/<CLIENT>/`, datés de maintenant pour que le watcher attende ses 5 s de stabilité. |
+| `GET /rapport?run_id=` | Le rapport `ERREUR_*.txt` du chargement, en téléchargement. |
 
 #### `src/api/stock/` — Stock (`/api/stock`)
 
@@ -700,17 +717,17 @@ supprimé depuis. `reporting` importe directement les `service.py` de l'API.
 | Dossier (`/opt/SageAgent/…`) | Rôle |
 |---|---|
 | `storage_srv/` (non versionné) | `upload/<CLIENT>/` (dépôts SFTP, bind mount de `/var/sftp/upload`), `queue/` (file d'attente de l'ETL), `broker_queue/` (ancienne file, vide), `archives/<CLIENT>/<date>/` (succès, sert aussi de snapshots à l'API), `error/<CLIENT>/<date>/` (échecs), `events/events.jsonl` (repli de l'event store), `rapport/<CLIENT>/<date>/` (rapports générés). |
-| `service/` | Unités systemd à copier dans `/etc/systemd/system/` (mode d'emploi en bas de chaque fichier) : `SageAgent_etl`, `SageAgent_api` (port 8000), `SageAgent_front` (port 8504, nouveaux dashboards Next.js), `SageAgent_dashbi` (port 8505, instance unique), `sageagent-dashbi@` (une instance par client, port lu dans `/etc/sageagent/clients/<client>.env`, modèles dans `service/clients/*.env`), `SageAgent_rapports` + `.timer` (oneshot à 07:00, heure de `Africa/Casablanca`, `Persistent=true`), `sudoers-sftp-onboard` (permet à l'utilisateur du Dashboard Ops de lancer **uniquement** `sftp_onboard.sh` en root). |
-| `nginx/` | Reverse proxy : `<client>.sageagent.test` → port local de l'instance du client (`map $host $sageagent_port` dans `sageagent_clients.conf`), HTTP → HTTPS. `README.md` explique les notions et la configuration ; `docs/nginx/` décrit les phases 1 (domaine de test) et 2 (vrai domaine). |
+| `service/` | Unités systemd à copier dans `/etc/systemd/system/` (mode d'emploi en bas de chaque fichier) : `SageAgent_etl`, `SageAgent_api` (port 8000), `SageAgent_front` (`127.0.0.1:8504`, nouveaux dashboards Next.js), `SageAgent_dashops` (Dashboard Ops, `127.0.0.1:8585`, chemin `/tech`), `SageAgent_dashbi` (port 8505, instance unique), `sageagent-dashbi@` (une instance par client, port lu dans `/etc/sageagent/clients/<client>.env`, modèles dans `service/clients/*.env`), `SageAgent_rapports` + `.timer` (oneshot à 07:00, heure de `Africa/Casablanca`, `Persistent=true`), `sudoers-sftp-onboard` (permet à l'utilisateur du Dashboard Ops de lancer **uniquement** `sftp_onboard.sh` en root). |
+| `nginx/` | Reverse proxy : `<client>.sageagent.test` → port local de l'instance du client (`map $host $sageagent_port` dans `sageagent_clients.conf`), HTTP → HTTPS. `README.md` explique les notions et la configuration ; `docs/nginx/` décrit les phases 1 (domaine de test) et 2 (vrai domaine). `itbord_ma.conf` : **https://itbord.ma** → front Next.js (`127.0.0.1:8504`), corps limité à 20 Mo sauf `/depot/api/fichiers/` (2 Go, en flux), et `/tech` → Dashboard Ops (`127.0.0.1:8585`, WebSocket), certificat Let's Encrypt renouvelé par `certbot.timer` (démarche, dossiers créés et renouvellement : partie 10). |
 | `certs/` | Clés RSA de signature des JWT (`private.pem`, `public.pem`). |
 | `data_Client/reference/` | `auth.json` : **registre des clients** (clé client → schéma, identifiant, rôle, port du dashboard), lu par `reporting/generate.py` et le Dashboard Ops. Description des tables Sage (`.md`, `.xlsx`, `db_struct.txt`). |
 | `data_Client/files/` | Jeux de fichiers Sage d'exemple (`Client_test`, `muliparts`) pour les tests manuels. |
 | `hermes/`, `hermes-docker/` | Agent IA externe (Hermes, Nous Research) en Docker, et documentation de ses outils API (`TOOLS_API.md`). Il consomme l'API via `/telegram`. Indépendant de `app/`. |
 | `.claude/graphify-out/` | Graphe de dépendances (partie 6). |
 
-**Ports utilisés** : API 8000 · Dashboard BI 8505 (instance unique) · par client : cross 8506,
-rousseau 8507, mms 8508, muliparts 8509, client_01 8510, health 8511 · Dashboard Ops 8585 ·
-Redis 6379 · PostgreSQL 5432.
+**Ports utilisés** : nginx 80/443 (`itbord.ma`) · Front 8504 (local seulement, public par `itbord.ma`) · API 8000 · Dashboard Ops 8585 (local seulement, public par `itbord.ma/tech`) ·
+Redis 6379 · PostgreSQL 5432. Libérés le 20/11/2026 (Streamlit arrêté, partie 10.8) : Dashboard BI 8505 et,
+par client, cross 8506, rousseau 8507, mms 8508, muliparts 8509, client_01 8510, health 8511.
 
 ---
 
@@ -739,9 +756,10 @@ Constatés à la lecture du code. À traiter avant ou pendant la reprise du proj
    « Services & stockage » du Dashboard Ops le signale.
 5. **Les rapports planifiés ne tournent pas encore** : `SageAgent_rapports.service` et `.timer`
    ne sont pas installés dans `/etc/systemd/system/`. Les unités ETL, API et dashboard le sont.
-6. Le Dashboard Ops n'a pas de service systemd : il est lancé à la main avec `nohup`, sous
-   l'utilisateur `amohamed`. La règle sudoers dépend de cet utilisateur. Les unités systemd
-   utilisent `amohamed` ou `ubuntu` selon le fichier.
+6. Le Dashboard Ops tourne dans le service `SageAgent_dashops` sous l'utilisateur `amohamed`
+   (depuis le 20/11/2026 ; auparavant lancé à la main avec `nohup`). La règle sudoers de
+   l'onboarding dépend de cet utilisateur. Les unités systemd utilisent `amohamed` ou `ubuntu`
+   selon le fichier.
 7. `utils/migrations/add_as_montsto.sql` contient une liste de schémas écrite en dur, à compléter
    pour chaque nouveau client.
 
@@ -779,6 +797,13 @@ Constatés à la lecture du code. À traiter avant ou pendant la reprise du proj
 6. Test : déposer les 11 fichiers dans le dossier SFTP et suivre le run dans
    « Historique des runs ».
 
+### Certificat SSL de `itbord.ma`
+
+Renouvelé automatiquement (`certbot.timer`, à 30 jours de l'échéance ; DNS sur `51.255.161.55` et
+port 80 ouvert obligatoires). Vérifier : `sudo certbot certificates` (expiration) et
+`sudo certbot renew --dry-run` (simulation). En cas d'échec : `/var/log/letsencrypt/letsencrypt.log`.
+Détails et dépannage : partie 10.
+
 ### Ajouter un rapport planifié à un client
 
 Ajoutez `{"rapport": "<nom>", "filtres": {...}}` dans `RAPPORTS_CLIENTS["<CLIENT>"]["rapports"]`
@@ -809,3 +834,186 @@ Dashboard Ops → **Historique des runs** → choisir le client et la date → l
 l'étape, le code d'erreur, le message envoyé au client et l'investigation ligne par ligne.
 Sans le Dashboard : `logs/etl_error.log/<CLIENT>/<date>.log`, les fichiers dans
 `storage_srv/error/<CLIENT>/<date>/` et la table `etl_events.pipeline_events` (filtrer sur `run_id`).
+
+---
+
+## 10. Mise en ligne : domaine `itbord.ma` et certificat SSL
+
+**En production depuis le 20/11/2026.** Le front ITBORD (Next.js, port 8504) est servi en HTTPS sur
+**https://itbord.ma** par le nginx du serveur `51.255.161.55`, avec un certificat Let's Encrypt
+renouvelé automatiquement par certbot. (Copie de travail détaillée : `docs/nginx/4th_implementation/README.md`.)
+
+```
+navigateur ══HTTPS══▶ nginx 51.255.161.55:443 ──▶ 127.0.0.1:8504 (front Next.js) ──▶ 127.0.0.1:8000 (API)
+           itbord.ma   certificat Let's Encrypt
+```
+
+### 10.1 Pourquoi cette méthode
+
+| Option étudiée | Verdict |
+|---|---|
+| **Redirections 301 de `*.ittelecom.ma`** (serveur 5.196.101.123, géré par ittelecom) vers `http://51.255.161.55:<port>` | Pas de HTTPS possible : le navigateur finit sur une IP (aucun certificat ne couvre une IP), en clair. Les ports 8506-8509 n'écoutent qu'en local : ces liens ne répondent pas. |
+| **Reverse proxy sur 5.196.101.123** (`proxy_pass` vers notre nginx en HTTPS) | Valable, préparé (`docs/nginx/3rd_implementation/`, `nginx/itbord.conf`, `nginx/ittelecom_proxy_5196.conf`) mais **non déployé** : dépend de l'admin de 5.196. Lancé puis annulé le 19/11/2026. |
+| **OVH SSL Gateway** | Exige aussi de changer le DNS ; offre payante (Advanced) dès plusieurs sous-domaines ; un seul ensemble IP:port pour tous les domaines. Pas d'avantage ici. |
+| **DNS direct + certbot sur notre nginx** ✅ | Retenu : gratuit, officiel (Let's Encrypt est une autorité reconnue par tous les navigateurs ; certbot est son client recommandé, développé par l'EFF), renouvellement automatique, aucune dépendance externe. |
+
+Le certificat est de type **DV** (validation du domaine) : même chiffrement et même cadenas qu'un
+certificat payant. Un certificat OV/EV (validation de la société) ne se justifierait que s'il était exigé
+par un client.
+
+**Un seul front pour tous les clients** (au lieu d'un port Streamlit par client) : le client et le
+profil viennent du jeton de connexion, pas de l'adresse. L'API refuse tout schéma hors
+`allowed_schemas` et impose le `co_no` d'un collaborateur ; le cache de l'API (`api/common/cache.py`)
+a une clé par client et par requête (dont `co_no`) ; le front n'a pas de cache partagé (`cache: 'no-store'`).
+Des rapports propres à un client se gèrent de la même façon (liste des clients autorisés par rapport,
+vérifiée par l'API), sans port dédié.
+
+### 10.2 DNS (chez Heberjahiz, registrar de `itbord.ma`)
+
+Espace client Heberjahiz → **Mes services → itbord.ma → Mon domaine**.
+
+- Onglet **DNS** (serveurs DNS) : **non modifié** — reste sur « DNS de redirection »
+  (`dmns1.heberjahiz.com`, `dmns2.heberjahiz.com`), ce qui laisse la zone gérée par Heberjahiz.
+- Onglet **Zone Edit** (enregistrements) :
+
+| Hostname | Type | Avant | Après |
+|---|---|---|---|
+| `@` | A | 169.50.173.20 (parking Heberjahiz) | **51.255.161.55** |
+| `www` | A | 169.50.173.20 | **51.255.161.55** |
+| `*` | A | 169.50.173.20 | **supprimé** (pas de sous-domaines pour l'instant) |
+
+Pas d'enregistrement AAAA (IPv6) : nginx n'écoute pas en IPv6 sur 443. Onglet Email/MX non touché.
+Expiration du domaine : **22/09/2027** (à renouveler chez Heberjahiz).
+
+Vérification : `dig +short itbord.ma @8.8.8.8` et `dig +short www.itbord.ma @8.8.8.8` → `51.255.161.55`
+(sous Windows : `nslookup itbord.ma 8.8.8.8`).
+
+### 10.3 Commandes exécutées sur le serveur
+
+certbot 4.0.0 et `python3-certbot-nginx` étaient déjà installés (paquets Ubuntu).
+
+```bash
+# 1. Certificat (validation HTTP-01 sur le port 80, via nginx) — une fois le DNS propagé
+sudo certbot certonly --nginx -d itbord.ma -d www.itbord.ma -m <email> --agree-tos --no-eff-email
+
+# 2. Site nginx (fichier du dépôt)
+sudo cp /opt/SageAgent/nginx/itbord_ma.conf /etc/nginx/sites-available/itbord_ma.conf
+sudo ln -sf /etc/nginx/sites-available/itbord_ma.conf /etc/nginx/sites-enabled/itbord_ma.conf
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+Résultat constaté le 20/11/2026 :
+
+| Test | Résultat |
+|---|---|
+| `http://itbord.ma` | 301 → `https://itbord.ma/` |
+| `https://www.itbord.ma` | 301 → `https://itbord.ma/` |
+| `https://itbord.ma/login` | 200, en-tête `Strict-Transport-Security: max-age=31536000` |
+| Certificat | `CN=itbord.ma`, SAN `itbord.ma, www.itbord.ma`, émetteur Let's Encrypt `YE1`, clé ECDSA, **valide du 20/11/2026 au 18/02/2027** |
+
+### 10.4 Fichiers et dossiers créés
+
+**Dans le dépôt (versionnés)**
+
+| Fichier | Rôle |
+|---|---|
+| `nginx/itbord_ma.conf` | Site nginx : HTTP → HTTPS, `www` → domaine nu, HTTPS → `127.0.0.1:8504` avec `Host` (Next.js compare Origin et Host pour les Server Actions, dont le login), `X-Forwarded-Proto https` (cookies de session `Secure`, `lib/session.ts`), `X-Forwarded-For`, HSTS, timeout 300 s (exports PDF/Excel). **Source de vérité** : toute modification se fait ici puis est recopiée dans `/etc/nginx/`. |
+| `docs/nginx/4th_implementation/README.md` | Même démarche, à côté des phases nginx précédentes. |
+
+**Sur le serveur (hors dépôt)**
+
+| Chemin | Créé par | Contenu |
+|---|---|---|
+| `/etc/nginx/sites-available/itbord_ma.conf` | nous (copie du dépôt) | Site actif |
+| `/etc/nginx/sites-enabled/itbord_ma.conf` | nous (lien symbolique) | Active le site |
+| `/etc/letsencrypt/live/itbord.ma/` | certbot | **Liens** vers la version courante : `fullchain.pem` (certificat + chaîne, utilisé par nginx), `privkey.pem` (**clé privée**, utilisée par nginx), `cert.pem`, `chain.pem`. nginx pointe toujours ici : un renouvellement ne demande aucun changement de config. |
+| `/etc/letsencrypt/archive/itbord.ma/` | certbot | Les vrais fichiers, numérotés (`cert1.pem`, `privkey1.pem`, puis `…2.pem` au renouvellement). |
+| `/etc/letsencrypt/renewal/itbord.ma.conf` | certbot | Paramètres du renouvellement : `authenticator = nginx`, `installer = nginx` (rechargement de nginx après renouvellement), `key_type = ecdsa`. |
+| `/etc/letsencrypt/accounts/` | certbot | Compte ACME Let's Encrypt (lié à l'email fourni). |
+| `/etc/letsencrypt/renewal-hooks/{pre,deploy,post}/` | certbot | Scripts optionnels lancés autour d'un renouvellement (vides). |
+| `/etc/letsencrypt/options-ssl-nginx.conf`, `ssl-dhparams.pem` | plugin nginx de certbot | Réglages TLS proposés par certbot — **non utilisés** par `itbord_ma.conf`. |
+| `/var/log/letsencrypt/letsencrypt.log` | certbot | Journal des demandes et renouvellements (premier endroit à lire en cas d'échec). |
+| `/etc/nginx/ssl/itbord-backend.{crt,key}` | `install_itbord.sh` (phase 3, annulée) | Certificat auto-signé pour le proxy de 5.196 — sans effet tant que `itbord.conf` est désactivé. |
+
+`/etc/letsencrypt/` contient la clé privée : **jamais dans git**. À inclure dans les sauvegardes du
+serveur (sinon, après une réinstallation, refaire simplement la commande certbot de 10.3).
+
+### 10.5 Renouvellement
+
+- Un certificat Let's Encrypt dure **90 jours**. Le timer systemd `certbot.timer` (installé par le
+  paquet) lance `certbot renew` deux fois par jour ; certbot ne renouvelle qu'à **30 jours** de
+  l'échéance, soit vers le **19/01/2027** pour le certificat actuel, puis tous les ~60 jours.
+- Le renouvellement refait la validation HTTP-01 sur le port 80, puis recharge nginx. Aucune action
+  manuelle.
+
+Conditions pour que ça continue de marcher :
+1. **Le DNS de `itbord.ma` et `www.itbord.ma` reste sur `51.255.161.55`.**
+2. **Le port 80 reste ouvert** (si `ufw` est activé : `sudo ufw allow 'Nginx Full'`, pas seulement 443).
+3. Le bloc `listen 80` de `itbord_ma.conf` reste en place (certbot y injecte temporairement le défi).
+4. Le domaine reste payé chez Heberjahiz (échéance 22/09/2027).
+
+Let's Encrypt n'envoie plus d'emails d'alerte avant expiration : vérifier de temps en temps.
+
+```bash
+sudo certbot certificates                 # certificats gérés, domaines, date d'expiration
+sudo certbot renew --dry-run              # simulation complète du renouvellement (sans rien changer)
+systemctl list-timers | grep certbot      # prochain passage du timer
+echo | openssl s_client -connect itbord.ma:443 -servername itbord.ma 2>/dev/null \
+  | openssl x509 -noout -dates            # dates du certificat réellement servi (sans sudo)
+sudo tail -50 /var/log/letsencrypt/letsencrypt.log
+```
+
+Renouvellement forcé (si besoin, ex. après un incident) : `sudo certbot renew --force-renewal`
+(à ne pas répéter : Let's Encrypt limite le nombre de certificats par semaine).
+
+### 10.6 Dépannage
+
+| Symptôme | Cause probable | Action |
+|---|---|---|
+| `certbot renew` échoue, « Timeout during connect » / « unauthorized » | Port 80 fermé ou DNS modifié | `dig +short itbord.ma @8.8.8.8`, `sudo ufw status`, `curl -I http://itbord.ma` |
+| Navigateur : certificat expiré | Renouvellement en échec depuis 30 jours | Lire `/var/log/letsencrypt/letsencrypt.log`, corriger, `sudo certbot renew` |
+| 502 Bad Gateway | Front arrêté | `systemctl status SageAgent_front`, `curl -I http://127.0.0.1:8504/login` |
+| Connexion impossible (erreur « Server Action » / origine) | En-tête `Host` non transmis | Vérifier `proxy_set_header Host $host;` dans `itbord_ma.conf` |
+| Déconnecté à chaque page | Cookies `Secure` non reçus | Vérifier `X-Forwarded-Proto https` dans `itbord_ma.conf` |
+
+### 10.7 Retour arrière
+
+```bash
+sudo rm /etc/nginx/sites-enabled/itbord_ma.conf
+sudo nginx -t && sudo systemctl reload nginx
+```
+Le front n'écoute plus que sur `127.0.0.1` : pour le rendre de nouveau joignable sans nginx, remettre
+`-H 0.0.0.0` dans `service/SageAgent_front` (puis `cp` vers `/etc/systemd/system/`, `daemon-reload`,
+`restart`) ; il est alors sur `http://51.255.161.55:8504`. Le certificat peut rester dans
+`/etc/letsencrypt` (ou `sudo certbot delete --cert-name itbord.ma` pour le supprimer et arrêter
+son renouvellement).
+
+### 10.8 Ce qui reste à faire
+
+- [ ] **Fermer l'API au public** : `SageAgent_api` écoute sur `0.0.0.0:8000`, et `/telegram/` n'a
+      aucune authentification (partie 8, sécurité, point 2). Passer `--host 127.0.0.1` : tous les
+      appelants internes (front, dashboard_ops, hermes) utilisent `localhost`.
+- [x] **Front en local** (fait le 20/11/2026) : `SageAgent_front` lancé avec `-H 127.0.0.1` ; accès public
+      uniquement par **https://itbord.ma**, `http://<IP>:8504` ne répond plus.
+- [ ] Pare-feu : `sudo ufw allow OpenSSH` (en premier), `sudo ufw allow 'Nginx Full'`, `sudo ufw enable`
+      — garder une 2ᵉ session SSH ouverte pendant l'opération.
+- [x] **Instances Streamlit arrêtées** (fait le 20/11/2026) : `SageAgent_dashbi` (8505) et
+      `sageagent-dashbi@<client>` (client_01, cross, mms, muliparts, rousseau : 8506 à 8510) sont arrêtés
+      **et désactivés** (`systemctl disable --now`) : ils ne redémarrent plus avec le serveur. Tous les clients
+      passent par le front (`https://itbord.ma`). Le Dashboard Ops (8585) n'est pas concerné. Retour arrière :
+      `sudo systemctl enable --now SageAgent_dashbi` (ou `sageagent-dashbi@<client>`).
+- [x] **Dashboard Ops en service et en local** (fait le 20/11/2026) : service systemd `SageAgent_dashops`
+      (`service/SageAgent_dashops`, démarré avec le serveur, relancé s'il s'arrête), qui écoute sur
+      `127.0.0.1:8585` seulement. Accès public uniquement par **https://itbord.ma/tech** (nginx) ;
+      `http://<IP>:8585` ne répond plus.
+- [x] **Alerte d'expiration du certificat** (fait le 20/11/2026), dans le Dashboard Ops, sans cron :
+      `certificat_status()` (`src/dashboard_ops/services/system_status.py`) lit le certificat réellement servi
+      par nginx pour `itbord.ma` (connexion TLS sur `127.0.0.1:443`, car `/etc/letsencrypt` est réservé à root).
+      Même contrôle que `openssl x509 -checkend`, mais sur le certificat servi : un certificat renouvelé que
+      nginx n'a pas rechargé est aussi repéré. Alerte rouge dans la barre latérale de toutes les pages (vérification en cache 1 h)
+      si le certificat est invalide, s'il expire dans moins de 20 jours (certbot renouvelle à 30 jours de
+      l'échéance : le renouvellement a donc échoué, voir 10.6) ou si `certbot.timer` est arrêté. Date
+      d'expiration et jours restants : page « Services & stockage ». Aucune notification : l'alerte n'est vue
+      qu'en ouvrant le Dashboard Ops.
+- ~~(Plus tard) Si le proxy de 5.196 est déployé : `docs/nginx/3rd_implementation/`.~~ **Abandonné** :
+  cette méthode ne sera pas déployée.

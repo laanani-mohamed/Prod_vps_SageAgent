@@ -71,6 +71,12 @@ export default function Menu({ client, collaborateur, nom, miseAJour }: { client
         Passer bon de commande
         <Attente />
       </Link>
+      <Link prefetch={false} href="/depot" className="entree" aria-current={chemin.startsWith('/depot') ? 'page' : undefined}>
+        <Icone d="M12 15V4M7 9l5-5 5 5M4 15v5h16v-5" />
+        Dépôt des fichiers
+        {collaborateur && <span className="interdit" aria-label="Accès refusé">{INTERDIT}</span>}
+        <Attente />
+      </Link>
       <div className="espace" />
       <p className="maj">Dernière mise à jour : <span>{miseAJour}</span></p>
       <div className="utilisateur">

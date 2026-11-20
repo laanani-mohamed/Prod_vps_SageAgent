@@ -6,6 +6,8 @@ Zéro dépendance Streamlit. Lecture seule : aucune commande ne modifie le syst�
 import os
 import re
 import shutil
+import socket
+import ssl
 import subprocess
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
@@ -19,6 +21,8 @@ PURGE_SCRIPT_SH = os.path.join(_APP_ROOT, "utils", "purge", "purge_archives.sh")
 PURGE_SCRIPT_PY = os.path.join(_APP_ROOT, "utils", "purge", "purge_archives.py")
 RETENTION_DAYS = 30
 _UNIT_PATTERNS = ["SageAgent*", "sageagent*"]
+CERT_HOTE = "itbord.ma"
+CERT_ALERTE_JOURS = 20   # certbot renouvelle à 30 jours de l'échéance : en dessous de 20, le renouvellement a échoué
 
 
 def _run(cmd: List[str]) -> str:
@@ -140,3 +144,33 @@ def purge_status() -> Dict:
         "derniere_purge": _last_purge_event(),
         "retention_jours": RETENTION_DAYS,
     }
+
+
+def certificat_status() -> Dict:
+    """
+    Certificat HTTPS présenté par nginx pour CERT_HOTE (même contrôle que `openssl x509 -checkend`, mais sur le
+    certificat réellement servi : /etc/letsencrypt est réservé à root, et un renouvellement que nginx n'a pas
+    rechargé est aussi détecté) et état du timer de renouvellement certbot.
+    """
+    timer = _run(["systemctl", "is-active", "certbot.timer"]).strip()
+    try:
+        with socket.create_connection(("127.0.0.1", 443), timeout=5) as brut, \
+                ssl.create_default_context().wrap_socket(brut, server_hostname=CERT_HOTE) as tls:
+            fin = datetime.fromtimestamp(ssl.cert_time_to_seconds(tls.getpeercert()["notAfter"]), tz=timezone.utc)
+        erreur = None
+    except OSError as e:   # certificat expiré ou invalide (ssl.SSLError), nginx injoignable
+        fin, erreur = None, str(e)
+    return {"hote": CERT_HOTE, "expire_le": fin, "erreur": erreur, "timer_actif": timer == "active"}
+
+
+def alerte_certificat(cert: Dict) -> Optional[str]:
+    """Message d'alerte si le certificat est invalide, proche de l'échéance ou sans renouvellement automatique."""
+    if cert["erreur"]:
+        return f"Certificat de {cert['hote']} invalide ou injoignable : {cert['erreur']}"
+    jours = (cert["expire_le"] - datetime.now(timezone.utc)).days
+    if jours < CERT_ALERTE_JOURS:
+        return (f"Le certificat de {cert['hote']} expire dans {jours} jour(s) : le renouvellement automatique a échoué "
+                "(DOCUMENTATION.md, partie 10.6).")
+    if not cert["timer_actif"]:
+        return "certbot.timer est arrêté : le certificat ne sera pas renouvelé automatiquement."
+    return None

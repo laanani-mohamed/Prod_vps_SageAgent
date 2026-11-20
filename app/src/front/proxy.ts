@@ -35,4 +35,5 @@ export async function proxy(req: NextRequest) {
   return res
 }
 
-export const config = { matcher: ['/((?!_next/|favicon.ico|connexion-fond.webp).*)'] }   // image de la page de connexion : publique
+// Exclus : image de la page de connexion (publique) ; envois de fichiers du dépôt (corps en flux, voir app/depot/api)
+export const config = { matcher: ['/((?!_next/|favicon.ico|connexion-fond.webp|depot/api/fichiers/).*)'] }

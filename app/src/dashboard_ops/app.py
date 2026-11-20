@@ -1,16 +1,10 @@
 """
-# Stopper
-pkill -f "streamlit run src/dashboard_ops"
-
-# Relancer (depuis /opt/SageAgent/app)
-cd /opt/SageAgent/app
-nohup .venv/bin/streamlit run src/dashboard_ops/app.py --server.port 8585 --server.headless true > /tmp/dashboard_ops.log 2>&1 &
-
 dashboard_ops/app.py — Point d'entrée de l'app Streamlit d'observabilité ETL.
 App séparée de dashboard_bi (ITBORD) : outil interne de debug, pas destiné aux clients.
 
-Lancer avec : streamlit run src/dashboard_ops/app.py --server.port 8585
-pkill -f "streamlit run src/dashboard_ops" 2>/dev/null; echo "pkill done"
+Service systemd SageAgent_dashops (service/SageAgent_dashops) : écoute sur 127.0.0.1:8585, chemin /tech,
+en ligne sur https://itbord.ma/tech (nginx/itbord_ma.conf).
+Après une modification du code : sudo systemctl restart SageAgent_dashops
 """
 import sys
 import os
@@ -30,11 +24,21 @@ import streamlit as st
 
 from ops_config import PAGE_TITLE
 from auth import require_auth, logout_button
+from services.system_status import certificat_status, alerte_certificat
 
 st.set_page_config(page_title=PAGE_TITLE, layout="wide", initial_sidebar_state="expanded")
 
 require_auth()
 logout_button()
+
+
+@st.cache_data(ttl=3600)
+def _alerte_certificat():
+    return alerte_certificat(certificat_status())
+
+
+if alerte := _alerte_certificat():   # visible sur toutes les pages ; détail dans « Services & stockage »
+    st.sidebar.error("🔒 " + alerte)
 
 pages = {
     "Observabilité": [

@@ -28,6 +28,7 @@ from api.transactions.router import router as transactions_router
 from api.referentiel.router import router as referentiel_router
 from api.bi.router import router as bi_router
 from api.auth.router import router as auth_router
+from api.depot.router import router as depot_router
 from api.auth.config import auth_settings
 from api.auth.dependencies import get_current_user
 from api.auth.schemas import TokenData
@@ -95,6 +96,7 @@ app.include_router(stock_router)
 app.include_router(transactions_router)
 app.include_router(referentiel_router)
 app.include_router(bi_router)
+app.include_router(depot_router)   # dépôt des fichiers Sage (directeur) : pas dans la sous-application Telegram
 
 # ---------------------------------------------------------------------------
 # Enregistrement de la sous-application Telegram (Sans Sécurité JWT)

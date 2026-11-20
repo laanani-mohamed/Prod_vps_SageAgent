@@ -104,6 +104,16 @@ server {
 - `proxy_set_header X-Forwarded-Proto $scheme` : indique au backend que la requête d'origine était en HTTPS (utile si l'appli a besoin de le savoir, ex. générer des liens absolus corrects).
 - `proxy_read_timeout 86400` : évite que nginx ne coupe la connexion WebSocket après le timeout par défaut (assez court) — la session Streamlit doit pouvoir rester ouverte des heures.
 
+### Front ITBORD sur `itbord.ma` (en production depuis le 20/11/2026)
+
+| Fichier dans le dépôt | Installé vers | Utilité |
+|---|---|---|
+| [`nginx/itbord_ma.conf`](/opt/SageAgent/nginx/itbord_ma.conf) | `/etc/nginx/sites-available/itbord_ma.conf` (+ lien dans `sites-enabled/`) | `http://` et `www` → `https://itbord.ma` ; HTTPS → front Next.js `127.0.0.1:8504`. Certificat Let's Encrypt (`/etc/letsencrypt/live/itbord.ma/`), renouvelé par `certbot.timer`. |
+| [`nginx/itbord.conf`](/opt/SageAgent/nginx/itbord.conf), [`nginx/ittelecom_proxy_5196.conf`](/opt/SageAgent/nginx/ittelecom_proxy_5196.conf) | non installés | Variante `*.ittelecom.ma` via le proxy de 5.196.101.123, préparée mais non déployée. |
+
+Démarche complète (DNS Heberjahiz, certbot, dossiers créés, renouvellement, dépannage) :
+[`docs/nginx/4th_implementation/README.md`](/opt/SageAgent/docs/nginx/4th_implementation/README.md).
+
 ### Ce qui n'est PAS géré par nginx dans ce projet
 
 - L'appel Streamlit → API FastAPI (`http://localhost:8000`) : interne au serveur, ne passe jamais par nginx.

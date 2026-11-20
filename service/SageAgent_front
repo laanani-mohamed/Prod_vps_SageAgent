@@ -1,5 +1,5 @@
 [Unit]
-Description=Front ITBORD - Next.js (nouveaux dashboards), port 8504
+Description=Front ITBORD - Next.js (nouveaux dashboards), 127.0.0.1:8504, https://itbord.ma
 After=network.target SageAgent_api.service
 
 # Protection contre la Boucle Infinie
@@ -13,7 +13,8 @@ Group=amohamed
 WorkingDirectory=/opt/SageAgent/app/src/front
 
 # Node 22 déjà présent sur le serveur (celui de hermes) ; build préalable : npm ci && npm run build
-ExecStart=/home/amohamed/.hermes/node/bin/node node_modules/next/dist/bin/next start -p 8504 -H 0.0.0.0
+# Écoute en local seulement : accès public par nginx sur https://itbord.ma (nginx/itbord_ma.conf)
+ExecStart=/home/amohamed/.hermes/node/bin/node node_modules/next/dist/bin/next start -p 8504 -H 127.0.0.1
 
 # API appelée côté serveur uniquement (le navigateur ne parle qu'au front)
 Environment=API_URL=http://127.0.0.1:8000

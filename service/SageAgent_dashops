@@ -1,0 +1,39 @@
+[Unit]
+Description=Dashboard Ops - Streamlit interne (127.0.0.1:8585), https://itbord.ma/tech
+After=network.target postgresql.service
+
+# Protection contre la Boucle Infinie
+StartLimitBurst=5
+StartLimitIntervalSec=60
+
+[Service]
+# amohamed : utilisateur visé par la règle sudoers-sftp-onboard (page Onboarding)
+User=amohamed
+Group=amohamed
+
+WorkingDirectory=/opt/SageAgent/app
+
+# Écoute en local seulement : accès public par nginx sur https://itbord.ma/tech (nginx/itbord_ma.conf),
+# qui transmet le chemin /tech/… tel quel, d'où --server.baseUrlPath tech.
+ExecStart=/opt/SageAgent/app/.venv/bin/streamlit run src/dashboard_ops/app.py --server.address 127.0.0.1 --server.port 8585 --server.headless true --server.baseUrlPath tech
+
+# Redémarrage automatique en cas de crash
+Restart=always
+RestartSec=10
+
+# Empêche Python de retenir les logs en mémoire
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
+
+# -------------
+# Installation (une seule fois)
+#   sudo cp /opt/SageAgent/service/SageAgent_dashops /etc/systemd/system/SageAgent_dashops.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now SageAgent_dashops.service
+#
+# Après une modification du code de src/dashboard_ops (le rechargement automatique de Streamlit ne suffit pas)
+#   sudo systemctl restart SageAgent_dashops.service
+#
+# Vérifier : curl http://127.0.0.1:8585/tech/_stcore/health → ok ; journaux : journalctl -u SageAgent_dashops -f

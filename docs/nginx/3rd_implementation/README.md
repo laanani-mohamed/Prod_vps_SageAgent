@@ -1,5 +1,10 @@
 # Implémentation 3 — Front ITBORD en HTTPS via le reverse proxy de 5.196.101.123
 
+> **État (20/11/2026) : préparée mais NON déployée.** Lancée puis annulée le 19/11/2026 (l'admin de
+> 5.196 ne déploie pas pour l'instant) : site `itbord.conf` désactivé, front et API remis sur `0.0.0.0`.
+> Le certificat auto-signé `/etc/nginx/ssl/itbord-backend.*` est resté sur le serveur, sans effet.
+> Le HTTPS est assuré à la place par **https://itbord.ma** : voir `docs/nginx/4th_implementation/`.
+
 Remplace les redirections 301 (`cross.ittelecom.ma` → `http://51.255.161.55:8506`, etc.), qui ne
 permettent pas le HTTPS, par un reverse proxy :
 

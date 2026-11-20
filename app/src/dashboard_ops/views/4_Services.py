@@ -4,7 +4,8 @@ from datetime import datetime, timezone
 import pandas as pd
 import streamlit as st
 
-from services.system_status import list_services, queue_status, disk_usage, storage_folders, purge_status
+from services.system_status import (list_services, queue_status, disk_usage, storage_folders, purge_status,
+                                    certificat_status, alerte_certificat)
 from components.formatting import fmt_taille, fmt_entier
 
 st.title("Services & stockage")
@@ -44,7 +45,19 @@ else:
         "Redémarrages auto": s["redemarrages_auto"],
         "Description": s["description"],
     } for s in services]), width="stretch", hide_index=True)
-st.caption("Le dashboard_ops lui-même n'est pas un service systemd (lancé via nohup) : il tourne, puisque cette page s'affiche.")
+
+# --- Certificat HTTPS --------------------------------------------------------
+st.markdown("### Certificat HTTPS")
+cert = certificat_status()
+c1, c2, c3 = st.columns(3)
+c1.metric("Domaine", cert["hote"])
+c2.metric("Expire le (UTC)", cert["expire_le"].strftime("%Y-%m-%d") if cert["expire_le"] else "—")
+c3.metric("Jours restants", (cert["expire_le"] - now).days if cert["expire_le"] else "—")
+alerte = alerte_certificat(cert)
+if alerte:
+    st.error("❌ " + alerte)
+else:
+    st.success("✅ Certificat valide, renouvellement automatique actif (certbot.timer).")
 
 # --- File d'attente ----------------------------------------------------------
 st.markdown("### File d'attente ETL")

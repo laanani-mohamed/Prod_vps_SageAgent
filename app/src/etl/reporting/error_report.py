@@ -42,7 +42,7 @@ def _build_message(detail: dict, run_id: str) -> str:
             f"Fichiers attendus : {', '.join(detail.get('fichiers_attendus', []))}\n"
             f"Fichiers trouvés  : {', '.join(detail.get('fichiers_trouves', []))}"
         )
-        actions = "Vérifiez les noms exacts des fichiers à déposer (respecter la casse et l'extension), puis redéposez l'ensemble des fichiers dans ce dossier."
+        actions = "Vérifiez les noms des fichiers à déposer (nom et extension .txt ; majuscules ou minuscules acceptées), puis redéposez l'ensemble des fichiers dans ce dossier."
 
     elif error_code == "EMPTY_FILES":
         probleme = f"le(s) fichier(s) suivant(s) sont vides (0 ligne de données) : {', '.join(detail.get('fichiers', []))}"
