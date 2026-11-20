@@ -4,7 +4,6 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useFormStatus } from 'react-dom'
 import { deconnexion } from '../app/actions'
-import { surCouleur } from '../lib/format'
 import { RAPPORTS } from '../lib/rapports'
 import { Attente } from './Interactions'
 
@@ -60,7 +59,7 @@ export default function Menu({ client, collaborateur, nom, miseAJour }: { client
       <div className="rapports">
         {RAPPORTS.map((r) => (
           <Link prefetch={false} key={r.n} href={`/rapports/${r.n}`} className="sous-entree" aria-current={chemin === `/rapports/${r.n}` ? 'page' : undefined}>
-            <span className="numero" style={{ background: r.couleur, color: surCouleur(r.couleur) }}>{r.n}</span>
+            <span className="numero">{r.n}</span>
             <span className="coupe">{r.menu}</span>
             {collaborateur && 'stock' in r && <span className="interdit" aria-label="Accès refusé">{INTERDIT}</span>}
             <Attente />

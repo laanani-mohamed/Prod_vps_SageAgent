@@ -18,7 +18,7 @@ from api.bi.repositories.archive_repo.base_bi_archive import safe_float_col
 logger = logging.getLogger("api.bi.use_cases.objectifs")
 
 # Constantes métier
-OBJECTIF_CA    = 25_000_000.0   # MAD
+OBJECTIF_CA    = 10_000_000.0   # MAD
 LIMITE_ENCOURS = 30_000_000.0  # MAD
 LIMITE_DETTES  = 20_000_000.0  # MAD (dettes fournisseurs, tableau de bord)
 SEUIL_CA_WARN  = 60.0          # % → alerte si CA < 60 % de l'objectif

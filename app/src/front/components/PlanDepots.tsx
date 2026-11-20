@@ -10,8 +10,9 @@ type Article = { ar_ref: string; ar_design: string; qte_stock: number; valeur_st
 type Famille = { code: string; nom: string | null; valeur: number; quantite: number; articles: number; top: Article[] }
 export type Depot = { no: number; nom: string | null; valeur: number; quantite: number; articles: number; nb_familles: number; familles: Famille[] }
 
-// Familles du dépôt : couleurs du rapport 9 (Balance Âgée) + une nuance ; texte blanc sur les deux plus foncées
-const TUILES = [['#1d3354', '#ffffff'], ['#467599', '#ffffff'], ['#d64045', '#1c1410'], ['#9ed8db', '#1c1410'], ['#e9fff9', '#1c1410'], ['#8fb0c8', '#1c1410']]
+// Familles : dégradé d'un même bleu (base #fcb91e), du plus foncé (famille la plus valorisée) au plus clair ;
+// texte blanc sur les deux plus foncés, foncé ensuite (contraste ≥ 4,5)
+const TUILES = [['#0b4f8a', '#ffffff'], ['#1670c0', '#ffffff'], ['#1e96fc', '#09090b'], ['#5cb3fd', '#09090b'], ['#a2d6f9', '#09090b'], ['#d6ecfd', '#09090b']]
 const ASPECT = 2.8   // largeur / hauteur de la carte des familles
 
 type Tuile = { k: number; nom: string; v: number; poids: number; x: number; y: number; w: number; h: number }
@@ -52,6 +53,7 @@ export default function PlanDepots({ depots, totaux, tous }: { depots: Depot[]; 
   }
   reste.poids = Math.max(reste.v, 0)
   const tuiles: Tuile[] = []
+  const rangValeur = new Map([...items].sort((x, y) => y.v - x.v).map((x, r) => [x.k, r]))   // teinte selon la valeur
   if (items.length) decouper(d.nb_familles > d.familles.length && reste.poids > 0 ? [...items, reste] : items, 0, 0, 100, 100, tuiles)
   const base = parValeur ? d.valeur : d.quantite
   const f = d.familles[j] ?? d.familles[0]
@@ -74,7 +76,7 @@ export default function PlanDepots({ depots, totaux, tous }: { depots: Depot[]; 
       {!tuiles.length ? <p className="vide">Aucun article en stock.</p> : (
         <div className="carte-familles">
           {tuiles.map((t) => {
-            const autres = t.k < 0, [fond, texte] = autres ? ['#ece7e2', '#3f3f46'] : TUILES[Math.min(t.k, TUILES.length - 1)]
+            const autres = t.k < 0, [fond, texte] = autres ? ['#ece7e2', '#3f3f46'] : TUILES[Math.min(rangValeur.get(t.k) ?? t.k, TUILES.length - 1)]
             const style = { left: `${t.x}%`, top: `${t.y}%`, width: `${t.w}%`, height: `${t.h}%`, background: fond, color: texte }
             const contenu = <>
               <span className="nom">{t.nom}</span>

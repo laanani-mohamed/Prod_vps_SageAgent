@@ -110,7 +110,7 @@ body { margin: 0; background: var(--fond); color: var(--texte); }
 .titre-rapports { color: var(--texte); font-weight: 600; }
 .titre-rapports:hover { background: none; }
 .rapports { display: flex; flex-direction: column; gap: 1px; padding-left: 8px; margin-bottom: 6px; }
-.numero { width: 22px; height: 22px; flex-shrink: 0; border-radius: 6px; display: grid; place-items: center; font-size: 12px; font-weight: 700; }
+.numero { width: 22px; height: 22px; flex-shrink: 0; display: grid; place-items: center; font-size: 13px; font-weight: 700; color: var(--doux); }
 .interdit { margin-left: auto; font-size: 12px; }
 .espace { flex: 1; min-height: 12px; }
 .utilisateur { display: flex; align-items: center; gap: 10px; padding: 10px; margin-bottom: 8px; border: 1px solid var(--bord); border-radius: 10px; font-size: 13px; }
@@ -155,7 +155,7 @@ body { margin: 0; background: var(--fond); color: var(--texte); }
 .entete-detail .sous-titre { margin-bottom: 4px; }
 .entete-detail p { margin: 4px 0 0; }
 .periode { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.periode input[type='date'] { height: 40px; padding: 0 10px; border: 1px solid var(--bord); border-radius: 8px; background: var(--carte); color: var(--texte); font: inherit; font-size: 14px; }
+.periode input.date { width: 128px;  height: 40px; padding: 0 10px; border: 1px solid var(--bord); border-radius: 8px; background: var(--carte); color: var(--texte); font: inherit; font-size: 14px; }
 .sous-bloc { border: 1px solid var(--bord); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .sous-bloc h3 { margin: 0; font-size: 15px; }
 .sous-titre { font-size: 13px; font-weight: 600; color: var(--doux); margin-bottom: -4px; }
@@ -172,6 +172,10 @@ body { margin: 0; background: var(--fond); color: var(--texte); }
 .kpis.accent .kpi { border-top: 3px solid var(--accent); }
 .kpi .doux:first-child { font-size: 13px; }
 .kpi .valeur { font-size: 22px; font-weight: 700; margin: 4px 0 2px; overflow-wrap: anywhere; }
+.kpi .progres { height: 6px; margin: 10px 0 6px; border-radius: 999px; background: var(--gris); overflow: hidden; }
+.kpi .progres span { display: block; height: 6px; border-radius: 999px; background: var(--accent); }
+.kpi .progres.depasse span { background: #c2410c; }
+.alerte-limite { color: #9a3412; font-weight: 600; }
 
 /* ---------- Tableaux ---------- */
 .defile { overflow-x: auto; }
@@ -380,3 +384,17 @@ button.tuile:hover { filter: brightness(1.06); }
 .etageres .piste span { height: 8px; }
 .etageres .droite strong, .etageres .droite span { display: block; }
 @media (max-width: 700px) { .carte-familles { height: 300px; } .chiffres-famille { grid-template-columns: minmax(0, 1fr); } }
+
+/* ---------- Tableau de bord : progression du CA HT ---------- */
+.progression { width: 100%; height: auto; display: block; }
+.progression .etiquette { font-size: 12px; fill: var(--doux); }
+.progression .etiquette.fort { font-size: 12px; font-weight: 700; fill: var(--texte); }
+
+/* ---------- Champ date : saisie jj-mm-aaaa + bouton calendrier ---------- */
+.champ-date { position: relative; display: inline-flex; width: 100%; }
+.periode .champ-date { width: 150px; }
+.champ-date input.date { width: 100%; padding-right: 38px; }
+.periode .champ-date input.date { width: 100%; }
+.ouvrir-calendrier { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 32px; height: 32px; border: 0; border-radius: 6px; background: none; color: var(--doux); display: grid; place-items: center; cursor: pointer; }
+.ouvrir-calendrier:hover { background: var(--gris); color: var(--texte); }
+.calendrier-cache { position: absolute; right: 0; bottom: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; border: 0; padding: 0; }

@@ -3,7 +3,7 @@ import Link from 'next/link'
 import type { CSSProperties, ReactNode } from 'react'
 import { court, entier, pct, surCouleur } from '../lib/format'
 import type { Params } from '../lib/params'
-import { Attente, CorpsCliquable, FormulaireGet } from './Interactions'
+import { Attente, ChampDate, CorpsCliquable, FormulaireGet } from './Interactions'
 
 export function Entete({ titre, sur, sousTitre, badge, actions }: {
   titre: string; sur?: string; sousTitre?: ReactNode; badge?: ReactNode; actions?: ReactNode
@@ -23,7 +23,7 @@ export function Entete({ titre, sur, sousTitre, badge, actions }: {
   )
 }
 
-export type Kpi = { nom: string; v: ReactNode; sous?: ReactNode; ton?: 'bon' | 'mauvais' }
+export type Kpi = { nom: string; v: ReactNode; sous?: ReactNode; ton?: 'bon' | 'mauvais'; progres?: number | null }   // progres : % d'une limite (barre)
 
 /** Tuiles KPI ; `accent` : bordure haute de la couleur de la page (maquettes des rapports). */
 export function Kpis({ items, accent }: { items: Kpi[]; accent?: boolean }) {
@@ -33,7 +33,13 @@ export function Kpis({ items, accent }: { items: Kpi[]; accent?: boolean }) {
         <div key={k.nom} className="kpi">
           <div className="doux">{k.nom}</div>
           <div className={`valeur ${k.ton ?? ''}`}>{k.v}</div>
-          {k.sous && <div className="doux petit">{k.sous}</div>}
+          {k.progres != null && (
+            <div className={k.progres > 100 ? 'progres depasse' : 'progres'} role="progressbar" aria-label={`${k.nom} : part de la limite`}
+              aria-valuenow={Math.round(k.progres)} aria-valuemin={0} aria-valuemax={100}>
+              <span style={{ width: `${Math.min(Math.max(k.progres, 0), 100)}%` }} />
+            </div>
+          )}
+          {k.sous && <div className={k.progres != null && k.progres > 100 ? 'petit alerte-limite' : 'doux petit'}>{k.sous}</div>}
         </div>
       ))}
     </div>
@@ -213,9 +219,9 @@ export function Periode({ p, du, au, label = 'Période' }: { p: Params; du: stri
         <input key={k} type="hidden" name={k} value={v as string} />
       ))}
       <span className="doux petit">{label}</span>
-      <input type="date" name="du" defaultValue={du} aria-label={`${label} : du`} />
+      <ChampDate name="du" valeur={du} aria-label={`${label} : du`} />
       <span aria-hidden="true">–</span>
-      <input type="date" name="au" defaultValue={au} aria-label={`${label} : au`} />
+      <ChampDate name="au" valeur={au} aria-label={`${label} : au`} />
       <button type="submit" className="secondaire">OK</button>
     </FormulaireGet>
   )
@@ -242,7 +248,8 @@ export function Champ({ label, name, defaut, type = 'text', placeholder, options
           {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         </select>
       ) : (
-        <input name={name} type={type} defaultValue={defaut} placeholder={placeholder} list={liste} min={type === 'number' ? 1 : undefined} />
+        type === 'date' ? <ChampDate name={name} valeur={defaut} />
+          : <input name={name} type={type} defaultValue={defaut} placeholder={placeholder} list={liste} min={type === 'number' ? 1 : undefined} />
       )}
     </label>
   )

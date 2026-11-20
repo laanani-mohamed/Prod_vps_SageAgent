@@ -52,6 +52,41 @@ async function Anneaux({ analytique }: { analytique: Promise<any> }) {
   )
 }
 
+const OBJECTIF_CA = 10_000_000   // objectif annuel (même valeur que OBJECTIF_CA de api/bi/use_cases/objectifs_uc.py)
+const MOIS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.']
+const brefMAD = (v: number) => (v >= 1e6 ? court(v).replace(' MMAD', ' M') : `${entier(Math.round(v / 1e3))} K`)
+
+/** Progression du CA HT : CA de chaque mois de la période (montant au-dessus, exact au survol). */
+async function ProgressionCA({ ventes, objectif }: { ventes: Promise<any>; objectif: number | null }) {
+  const mois: { mois: string; ca_ht: number }[] = (await ventes)?.data ?? []
+  const W = 560, H = 300, G = 8, HAUT = 24, BAS = 34, zone = H - HAUT - BAS
+  if (!mois.length) return <Carte titre="Progression du CA HT"><p className="vide">Aucune facture sur la période.</p></Carte>
+  const total = mois.reduce((s, m) => s + m.ca_ht, 0)
+  const max = Math.max(...mois.map((m) => m.ca_ht), 1)
+  const pas = (W - 2 * G) / mois.length, larg = Math.min(pas * 0.62, 46)
+  const xc = (i: number) => G + pas * (i + 0.5)
+  const resume = `CA HT ${court(total)} sur ${mois.length} mois${objectif ? `, soit ${pct(total / objectif * 100)} de l'objectif ${court(objectif)}` : ''}`
+  return (
+    <Carte titre="Progression du CA HT" note={<span className="legende"><span><i className="b" />CA HT du mois</span></span>}>
+      <svg className="progression" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={resume}>
+        <line x1={G} x2={W - G} y1={HAUT + zone} y2={HAUT + zone} stroke="var(--bord)" />
+        {mois.map((m, i) => {
+          const h = Math.max(1, (m.ca_ht / max) * zone * 0.9)
+          const n = Number(m.mois.slice(5, 7)) - 1
+          return (
+            <g key={m.mois}>
+              <rect x={xc(i) - larg / 2} y={HAUT + zone - h} width={larg} height={h} rx="4" fill="var(--accent)" opacity="0.85"><title>{`${MOIS[n]} ${m.mois.slice(0, 4)} : ${mad(m.ca_ht)} MAD HT`}</title></rect>
+              <text x={xc(i)} y={HAUT + zone - h - 5} textAnchor="middle" className="etiquette">{brefMAD(m.ca_ht)}</text>
+              <text x={xc(i)} y={H - 12} textAnchor="middle" className="etiquette">{MOIS[n]}</text>
+            </g>
+          )
+        })}
+      </svg>
+      <p className="doux petit">{resume}.</p>
+    </Carte>
+  )
+}
+
 async function Classements({ analytique, p, collab }: { analytique: Promise<any>; p: Params; collab: boolean }) {
   const a = await analytique
   const onglet = (lire(p, 'classement') || 'clients') as keyof typeof CLASSEMENTS
@@ -71,8 +106,8 @@ async function Classements({ analytique, p, collab }: { analytique: Promise<any>
       {collab && onglet === 'fournisseurs' ? <Interdit /> : (
         <Tableau
           colonnes={[{ nom: '#', largeur: '40px' }, { nom: onglet === 'clients' ? 'Nom client' : onglet === 'familles' ? 'Famille' : 'Nom fournisseur' },
-            { nom: onglet === 'fournisseurs' ? 'Encours' : 'CA HT', droite: true, largeur: '180px' },
-            { nom: onglet === 'fournisseurs' ? '% encours global' : '% CA global', droite: true, largeur: '200px' }]}
+            { nom: onglet === 'fournisseurs' ? 'Encours' : 'CA HT', droite: true, largeur: '108px' },
+            { nom: onglet === 'fournisseurs' ? '% encours' : '% CA', droite: true, largeur: '92px' }]}
           lignes={lignes.map((l: any, i: number) => ({
             cellules: [i + 1, l.nom, mad(l.v), (
               <span className="part" key="p"><span className="piste"><span style={{ width: `${((l.pct ?? 0) / maxPct) * 100}%` }} /></span>{pct(l.pct)}</span>
@@ -93,20 +128,21 @@ export default async function TableauDeBord({ searchParams }: { searchParams: Pr
   const au = lire(p, 'au') || defaut.fin
   // Une seule requête analytique, attendue par les deux blocs qui en dépendent
   const analytique = api(`/api/bi/dashboard/analytique?${new URLSearchParams({ client_schema: s.client ?? '', date_from: du, date_to: au })}`)
+  const ventes = api('/api/bi/rapport/ca', { client_schema: s.client, date_from: du, date_to: au, group_by: 'mois' })
   const d = await api('/api/bi/dashboard', { client_schema: s.client, date_from: du, date_to: au })
   const k = d?.kpis ?? {}
 
   return (
     <Page theme="indigo">
-      <Entete titre="Tableau de Bord — Indicateurs de Performance" sousTitre={`Période : du ${date(du)} au ${date(au)}`}
+      <Entete titre="Tableau de Bord" sousTitre={`Période : du ${date(du)} au ${date(au)}`}
         actions={<Periode p={p} du={du} au={au} />} />
 
       <div className="grille-5">
-        <Carte span={2} titre="Chiffre d'Affaires (objectif 25 MMAD)" note={<Puce>{du.slice(0, 4) === au.slice(0, 4) ? `YTD ${au.slice(0, 4)}` : 'Période'}</Puce>}>
+        <Carte span={2} titre="Chiffre d'Affaires (objectif 10 MMAD)" note={<Puce>{du.slice(0, 4) === au.slice(0, 4) ? `YTD ${au.slice(0, 4)}` : 'Période'}</Puce>}>
           <div className="grand-chiffre">{court(k.chiffre_affaires)}</div>
           <Jauge valeur={k.pct_objectif_ca ?? null} />
           <div className="pied-carte">
-            <span>Chiffre d&apos;Affaires N-1</span>
+            <span>Chiffre d&apos;Affaires {Number(du.slice(0, 4)) - 1}</span>
             <strong>{court(k.ca_n_minus_1)}
               {k.ca_evolution_pct != null && <span className={k.ca_evolution_pct < 0 ? 'mauvais' : 'bon'}> · {pct(k.ca_evolution_pct, true)}</span>}
             </strong>
@@ -118,18 +154,22 @@ export default async function TableauDeBord({ searchParams }: { searchParams: Pr
       </div>
 
       <Kpis items={[
-        { nom: 'Encours clients', v: court(k.encours_clients), sous: `${pct(k.pct_limite_encours)} de la limite 30 MMAD` },
+        { nom: 'Encours clients', v: court(k.encours_clients), progres: k.pct_limite_encours, sous: `${pct(k.pct_limite_encours)} de la limite 30 MMAD` },
         { nom: 'Clients actifs', v: entier(k.nb_clients_actifs), sous: 'au moins une facture de vente' },
         { nom: 'Total achats', v: court(k.total_achats) },
         { nom: 'Valeur du stock', v: court(k.valeur_stock) },
         { nom: 'Dettes fournisseurs', v: court(k.dettes_fournisseurs),
-          sous: k.pct_limite_dettes == null ? undefined : `${pct(k.pct_limite_dettes)} de la limite 20 MMAD`,
-          ton: (k.pct_limite_dettes ?? 0) > 100 ? 'mauvais' : undefined },
+          progres: k.pct_limite_dettes, sous: k.pct_limite_dettes == null ? undefined : `${pct(k.pct_limite_dettes)} de la limite 20 MMAD` },
       ]} />
 
-      <Suspense fallback={<Carte titre="Classements">{ATTENTE}</Carte>}>
-        <Classements analytique={analytique} p={p} collab={collab} />
-      </Suspense>
+      <div className="grille">
+        <Suspense fallback={<Carte titre="Progression du CA HT">{ATTENTE}</Carte>}>
+          <ProgressionCA ventes={ventes} objectif={du.slice(0, 4) === au.slice(0, 4) ? OBJECTIF_CA : null} />
+        </Suspense>
+        <Suspense fallback={<Carte titre="Classements">{ATTENTE}</Carte>}>
+          <Classements analytique={analytique} p={p} collab={collab} />
+        </Suspense>
+      </div>
     </Page>
   )
 }
