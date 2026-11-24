@@ -23,15 +23,15 @@ export function Entete({ titre, sur, sousTitre, badge, actions }: {
   )
 }
 
-export type Kpi = { nom: string; v: ReactNode; sous?: ReactNode; ton?: 'bon' | 'mauvais'; progres?: number | null }   // progres : % d'une limite (barre)
+export type Kpi = { nom: string; v: ReactNode; sous?: ReactNode; ton?: 'bon' | 'mauvais'; progres?: number | null; aide?: ReactNode }   // progres : % d'une limite (barre) ; aide : bouton « ? »
 
 /** Tuiles KPI ; `accent` : bordure haute de la couleur de la page (maquettes des rapports). */
 export function Kpis({ items, accent }: { items: Kpi[]; accent?: boolean }) {
   return (
     <div className={accent ? 'kpis accent' : 'kpis'} style={{ '--n': items.length } as CSSProperties}>
       {items.map((k) => (
-        <div key={k.nom} className="kpi">
-          <div className="doux">{k.nom}</div>
+        <div key={k.nom} className={k.aide ? 'kpi avec-aide' : 'kpi'}>
+          <div className="doux">{k.nom}{k.aide}</div>
           <div className={`valeur ${k.ton ?? ''}`}>{k.v}</div>
           {k.progres != null && (
             <div className={k.progres > 100 ? 'progres depasse' : 'progres'} role="progressbar" aria-label={`${k.nom} : part de la limite`}
@@ -116,7 +116,7 @@ export function Colonnes({ groupes, legende }: { groupes: { nom: string; a?: num
   const max = Math.max(...groupes.flatMap((g) => [g.a ?? 0, g.b]), 1)
   const barre = (v: number, cls: string) => (
     <span className={`col ${cls}`}>
-      <small>{court(v).replace(' MMAD', ' M').replace(' KMAD', ' K').replace(' DH', '')}</small>
+      <small>{court(v).replace(' MMAD', ' M').replace(' KMAD', ' K').replace(' MAD', '')}</small>
       <span style={{ height: `${Math.max(1, (v / max) * 100)}%` }} />
     </span>
   )

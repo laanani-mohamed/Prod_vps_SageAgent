@@ -2,15 +2,15 @@ import { lire, type Params } from './params'
 
 // Les 9 rapports (POST /api/bi/rapports/{nom}) : couleur propre à chacun ; `stock` = réservé au directeur.
 export const RAPPORTS = [
-  { n: 1, nom: 'chiffre_affaire', titre: "Chiffre d'Affaire", menu: "Chiffre d'Affaire", couleur: '#00a5cf' },
+  { n: 1, nom: 'chiffre_affaire', titre: "Chiffre d'Affaire", menu: "Chiffre d'affaires", couleur: '#00a5cf' },
   { n: 2, nom: 'comparaison_ca', titre: "Comparaison Chiffre d'Affaire", menu: 'Comparaison CA', couleur: '#25a18e' },
-  { n: 3, nom: 'balance', titre: 'Balance par Clients', menu: 'Balance par Clients', couleur: '#f35b04' },
-  { n: 4, nom: 'valeur_stock', titre: 'Valeur du Stock', menu: 'Valeur du Stock', couleur: '#f7b801', stock: true },
-  { n: 5, nom: 'visite_client', titre: 'Avant Visite Client', menu: 'Avant Visite Client', couleur: '#bcc72f' },
-  { n: 6, nom: 'produits_dormants', titre: 'Produits Dormants', menu: 'Produits Dormants', couleur: '#fe6d73', stock: true },
-  { n: 7, nom: 'lots_peremption', titre: 'Lots en Péremption', menu: 'Lots en Péremption', couleur: '#266967', stock: true },
+  { n: 3, nom: 'balance', titre: 'Balance par Clients', menu: 'Balance par client', couleur: '#f35b04' },
+  { n: 4, nom: 'valeur_stock', titre: 'Valeur du Stock', menu: 'Valeur du stock', couleur: '#f7b801', stock: true },
+  { n: 5, nom: 'visite_client', titre: 'Avant Visite Client', menu: 'Avant visite client', couleur: '#bcc72f' },
+  { n: 6, nom: 'produits_dormants', titre: 'Produits Dormants', menu: 'Produits dormants', couleur: '#fe6d73', stock: true },
+  { n: 7, nom: 'lots_peremption', titre: 'Lots en Péremption', menu: 'Lots en péremption', couleur: '#266967', stock: true },
   { n: 8, nom: 'consommation', titre: 'Consommation des Articles par Produits', menu: 'Consommation', couleur: '#7678ed', stock: true },
-  { n: 9, nom: 'balance_agee', titre: 'Balance Âgée par Clients', menu: 'Balance Âgée', couleur: '#467599' },
+  { n: 9, nom: 'balance_agee', titre: 'Balance Âgée par Clients', menu: 'Balance âgée', couleur: '#467599' },
 ] as const
 
 export type Rapport = (typeof RAPPORTS)[number]

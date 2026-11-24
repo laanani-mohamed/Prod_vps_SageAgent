@@ -214,7 +214,7 @@ export default function DepotFichiers({ initial }: { initial: EtatDepot }) {
                     <td>
                       {typeof e === 'number' ? (
                         <span className="barre-envoi">
-                          <span className="jauge" role="progressbar" aria-label={`Envoi de ${nom}`} aria-valuenow={e} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${e}%` }} /></span>
+                          <span className="barre-progression" role="progressbar" aria-label={`Envoi de ${nom}`} aria-valuenow={e} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${e}%` }} /></span>
                           <span className="petit doux">{e} %</span>
                         </span>
                       ) : e === 'attente' ? <span className="doux">En attente d&apos;envoi…</span>
@@ -249,7 +249,7 @@ export default function DepotFichiers({ initial }: { initial: EtatDepot }) {
         <section className="carte" aria-labelledby="depot-envoi">
           <div className="carte-titre"><h2 id="depot-envoi">2 · Envoi au traitement</h2></div>
           <div className="compteur-depot"><strong>{prets}</strong><span className="doux">/ {attendus.length} fichiers prêts</span></div>
-          <span className="jauge" aria-hidden="true"><span style={{ width: `${(prets / attendus.length) * 100}%` }} /></span>
+          <span className="barre-progression" aria-hidden="true"><span style={{ width: `${(prets / attendus.length) * 100}%` }} /></span>
           <ul className="controles-depot">
             {controles.map(([ok, titre, detail]) => (
               <li key={titre}>

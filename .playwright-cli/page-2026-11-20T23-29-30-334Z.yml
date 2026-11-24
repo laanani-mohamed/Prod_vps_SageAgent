@@ -1,0 +1,96 @@
+- generic [ref=e2]:
+  - navigation [ref=e3]:
+    - generic [ref=e4]:
+      - generic [ref=e5]: IT
+      - text: BORD
+    - link "Tableau de bord" [ref=e6] [cursor=pointer]:
+      - /url: "#"
+    - link "Fichier de base" [ref=e13] [cursor=pointer]:
+      - /url: "#"
+    - link "Ventes" [ref=e19] [cursor=pointer]:
+      - /url: "#"
+    - link "Achats" [ref=e24] [cursor=pointer]:
+      - /url: "#"
+    - link "Stock et mouvements" [ref=e30] [cursor=pointer]:
+      - /url: "#"
+    - link "Règlements" [ref=e35] [cursor=pointer]:
+      - /url: "#"
+    - paragraph [ref=e40]: Rapports
+    - generic [ref=e41]:
+      - link "1 Chiffre d'affaires" [ref=e42] [cursor=pointer]:
+        - /url: "#"
+        - generic [ref=e43]: "1"
+        - generic [ref=e44]: Chiffre d'affaires
+      - link "2 Comparaison CA" [ref=e45] [cursor=pointer]:
+        - /url: "#"
+        - generic [ref=e46]: "2"
+        - generic [ref=e47]: Comparaison CA
+      - link "3 Balance par client" [ref=e48] [cursor=pointer]:
+        - /url: "#"
+        - generic [ref=e49]: "3"
+        - generic [ref=e50]: Balance par client
+      - link "4 Valeur du stock" [ref=e51] [cursor=pointer]:
+        - /url: "#"
+        - generic [ref=e52]: "4"
+        - generic [ref=e53]: Valeur du stock
+      - link "5 Avant visite client" [ref=e54] [cursor=pointer]:
+        - /url: "#"
+        - generic [ref=e55]: "5"
+        - generic [ref=e56]: Avant visite client
+      - link "6 Produits dormants" [ref=e57] [cursor=pointer]:
+        - /url: "#"
+        - generic [ref=e58]: "6"
+        - generic [ref=e59]: Produits dormants
+      - link "7 Lots en péremption" [ref=e60] [cursor=pointer]:
+        - /url: "#"
+        - generic [ref=e61]: "7"
+        - generic [ref=e62]: Lots en péremption
+      - link "8 Consommation" [ref=e63] [cursor=pointer]:
+        - /url: "#"
+        - generic [ref=e64]: "8"
+        - generic [ref=e65]: Consommation
+      - link "9 Balance âgée" [ref=e66] [cursor=pointer]:
+        - /url: "#"
+        - generic [ref=e67]: "9"
+        - generic [ref=e68]: Balance âgée
+    - paragraph [ref=e69]: Actions
+    - generic [ref=e70]:
+      - link "Bon de commande" [ref=e71] [cursor=pointer]:
+        - /url: "#"
+      - link "Dépôt des fichiers 🚫" [ref=e77] [cursor=pointer]:
+        - /url: "#"
+        - generic [ref=e81]: Dépôt des fichiers
+        - generic [ref=e82]: 🚫
+    - paragraph [ref=e84]: "Dernière mise à jour : 20/11/2026 06:00"
+    - generic [ref=e85]:
+      - generic [ref=e86]: DE
+      - generic [ref=e87]:
+        - strong [ref=e88]: DEMO
+        - generic [ref=e89]: Directeur
+    - button "Se déconnecter" [ref=e91] [cursor=pointer]
+  - main [ref=e92]:
+    - generic [ref=e93]:
+      - heading "Chiffre d'Affaires (objectif 10 MMAD)" [level=2] [ref=e94]
+      - generic [ref=e95]: 8,42 MMAD
+      - img [ref=e96]:
+        - generic [ref=e99]: 84,2 %
+      - generic [ref=e100]:
+        - generic [ref=e101]: Chiffre d'Affaires 2025
+        - strong [ref=e102]: 7,9 MMAD
+    - generic [ref=e103]:
+      - heading "Chiffre d'Affaires (objectif 10 MMAD)" [level=2] [ref=e104]
+      - generic [ref=e105]: 8,42 MMAD
+      - img [ref=e106]:
+        - generic [ref=e108]: 0 %
+      - generic [ref=e109]:
+        - generic [ref=e110]: Chiffre d'Affaires 2025
+        - strong [ref=e111]: 7,9 MMAD
+    - generic [ref=e112]:
+      - heading "Chiffre d'Affaires (objectif 10 MMAD)" [level=2] [ref=e113]
+      - generic [ref=e114]: 8,42 MMAD
+      - img [ref=e115]:
+        - generic [ref=e118]: 112,5 %
+      - generic [ref=e119]:
+        - generic [ref=e120]: Chiffre d'Affaires 2025
+        - strong [ref=e121]: 7,9 MMAD
+    - generic [ref=e122]: 60 %

@@ -8,11 +8,28 @@ export const entier = (v?: number | null) => (absent(v) ? 'N/A' : N0.format(v))
 export const pct = (v?: number | null, signe = false) =>
   absent(v) ? 'N/A' : `${signe && v > 0 ? '+' : ''}${N1.format(v)} %`
 
-/** Montant abrégé : 5,20 MMAD · 354,2 KMAD · 980,00 DH. */
-export function court(v?: number | null) {
-  if (absent(v)) return 'N/A'
+/** Montant adapté à sa grandeur : [nombre, unité] — MMAD dès 1 million, KMAD dès 1 000, sinon MAD
+ *  (jamais « 0,25 MMAD » ni « 0,4 KMAD »). */
+export function montant(v?: number | null): [string, string] {
+  if (absent(v)) return ['N/A', '']
   const a = Math.abs(v)
-  return a >= 1e6 ? `${N2.format(v / 1e6)} MMAD` : a >= 1e3 ? `${N1.format(v / 1e3)} KMAD` : `${N2.format(v)} DH`
+  return a >= 1e6 ? [N2.format(v / 1e6), 'MMAD'] : a >= 1e3 ? [N1.format(v / 1e3), 'KMAD'] : [N2.format(v), 'MAD']
+}
+
+/** Montant abrégé : 5,20 MMAD · 354,2 KMAD · 980,00 MAD. */
+export function court(v?: number | null) {
+  const [n, u] = montant(v)
+  return u ? `${n} ${u}` : n
+}
+
+/** Année (ou années) d'une période : « 2025 », ou « 2024-2025 » si elle chevauche deux années. */
+export const annees = (du: string, au: string) => (du.slice(0, 4) === au.slice(0, 4) ? du.slice(0, 4) : `${du.slice(0, 4)}-${au.slice(0, 4)}`)
+
+/** Même date décalée de `n` années (29 février → 28 février). */
+export function decaler(iso: string, n: number) {
+  const a = Number(iso.slice(0, 4)) - n
+  const md = iso.slice(5, 10) === '02-29' ? '02-28' : iso.slice(5, 10)
+  return `${a}-${md}`
 }
 
 /** 2026-11-02(T…) → 02/11/2026. */

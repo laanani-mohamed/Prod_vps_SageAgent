@@ -370,7 +370,8 @@ def rapport(
     summary="Données prêtes à afficher d'une page du front (filtrées, totalisées, paginées)",
     description="""
 Vues de `api/bi/vues.py` : `reglements`, `documents`, `document`, `compteurs`, `articles`, `article`, `tiers`, `clients`,
-`depots`, `familles`, `stock_etat`, `stock_alertes`, `plan_depots`. `filtres` : propres à chaque vue
+`depots`, `familles`, `stock_etat`, `stock_alertes`, `plan_depots`, et (api/bi/vues_analyse.py) `tdb_plus`
+(panier moyen, rythme, alertes, top commerciaux), `ruptures_a`, `analyse_ventes`, `analyse_achats`. `filtres` : propres à chaque vue
 (voir les docstrings), `page` pour la pagination (50 lignes). Filtre manquant ou invalide → 400.
 Collaborateur : ses propres documents ; stock, achats et fournisseurs → 403.
     """,

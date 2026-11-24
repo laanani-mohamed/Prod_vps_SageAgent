@@ -14,6 +14,7 @@ import pandas as pd
 from fastapi.encoders import jsonable_encoder
 
 from api.bi.repositories.pg_repo.sql_helpers import validate_schema
+from api.bi import vues_analyse
 from api.common.cache import memo
 from api.db import get_db_connection
 from api.referentiel import service as referentiel
@@ -426,11 +427,13 @@ VUES = {
     "compteurs": compteurs, "articles": articles, "article": article, "tiers": tiers, "clients": clients,
     "depots": depots, "familles": familles,
     "stock_etat": stock_etat, "stock_alertes": stock_alertes, "plan_depots": plan_depots,
+    # Refonte : compléments du Tableau de Bord, onglets « Analyse » des Ventes et des Achats (vues_analyse.py)
+    **vues_analyse.VUES,
 }
 
 
 def reservee_directeur(nom: str, f: dict) -> bool:
     """Vue sans commercial (stock, achats, fournisseurs) : refusée à un collaborateur."""
-    return (nom in {"depots", "stock_etat", "stock_alertes", "plan_depots"}
+    return (nom in {"depots", "stock_etat", "stock_alertes", "plan_depots"} | vues_analyse.RESERVEES_DIRECTEUR
             or (nom in {"documents", "document", "reglements"} and int(f.get("domaine", 0)) != 0)
             or (nom == "tiers" and int(f.get("ct_type", 0)) != 0))

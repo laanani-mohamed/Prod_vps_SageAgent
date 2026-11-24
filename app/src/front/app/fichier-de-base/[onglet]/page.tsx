@@ -78,11 +78,11 @@ export default async function FichierDeBase({ params, searchParams }: { params: 
           <Kpis items={[
             { nom: 'Stock actuel', v: entier(a.article.stock), sous: 'tous dépôts' },
             { nom: 'Quantité vendue', v: entier(a.kpis.quantite_vendue), sous: 'factures de vente' },
-            { nom: 'CA HT', v: `${mad(a.kpis.ca_ht)} DH` },
+            { nom: 'CA HT', v: `${mad(a.kpis.ca_ht)} MAD` },
             { nom: "Coût d'achat total", v: mad(a.kpis.cout_achat), sous: "quantité × prix d'achat" },
           ]} />
           <Kpis items={[
-            { nom: 'Marge brute', v: `${mad(a.kpis.marge_brute)} DH` },
+            { nom: 'Marge brute', v: `${mad(a.kpis.marge_brute)} MAD` },
             { nom: 'Taux de marge', v: pct(a.kpis.taux_marge_pct) },
             { nom: 'Rentabilité globale', v: pct(a.kpis.rentabilite_pct), sous: a.kpis.rentabilite_pct == null ? "coût d'achat nul" : 'marge ÷ coût' },
           ]} />
@@ -139,7 +139,7 @@ export default async function FichierDeBase({ params, searchParams }: { params: 
           </div>
           {ctType === 0 ? <>
             <Kpis items={[
-              { nom: 'CA HT', v: mad(k.montant_ht), sous: k.evolution_pct == null ? undefined : <span className={ton(k.evolution_pct)}>{pct(k.evolution_pct, true)} vs N-1</span> },
+              { nom: 'CA HT', v: mad(k.montant_ht), sous: k.evolution_pct == null ? undefined : <span className={ton(k.evolution_pct)}>{pct(k.evolution_pct, true)} vs {Number(du.slice(0, 4)) - 1}</span> },
               { nom: 'Factures / avoirs', v: `${entier(k.nb_factures)} / ${entier(k.nb_avoirs)}` },
               { nom: 'Encours', v: mad(k.encours), sous: 'TTC restant dû' },
               { nom: 'Marge brute', v: mad(k.marge_brute), sous: `${pct(k.taux_marge_pct)} du CA` },
@@ -160,7 +160,7 @@ export default async function FichierDeBase({ params, searchParams }: { params: 
           </> : <>
             <div className="sous-titre">Indicateurs de base</div>
             <Kpis items={[
-              { nom: 'Achats HT', v: mad(k.montant_ht), sous: k.evolution_pct == null ? undefined : <span className={ton(k.evolution_pct)}>{pct(k.evolution_pct, true)} vs N-1 ({mad(k.montant_ht_n1)})</span> },
+              { nom: 'Achats HT', v: mad(k.montant_ht), sous: k.evolution_pct == null ? undefined : <span className={ton(k.evolution_pct)}>{pct(k.evolution_pct, true)} vs {Number(du.slice(0, 4)) - 1} ({mad(k.montant_ht_n1)})</span> },
               { nom: 'Factures / avoirs', v: `${entier(k.nb_factures)} / ${entier(k.nb_avoirs)}` },
               { nom: 'Dettes', v: mad(k.dettes), sous: "tout l'historique" },
             ]} />

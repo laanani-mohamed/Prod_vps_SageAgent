@@ -104,16 +104,15 @@ body { margin: 0; background: var(--fond); color: var(--texte); }
 .menu .maj { margin: 0 4px 8px; font-size: 12px; color: var(--doux); }
 .menu .maj span { white-space: nowrap; }
 .menu .logo { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; font-size: 14px; font-weight: 700; background: var(--accent); color: var(--sur-accent); }
-.entree, .sous-entree { display: flex; align-items: center; gap: 10px; border-radius: 8px; color: var(--doux); text-decoration: none; }
-.entree { padding: 9px 10px; font-size: 14px; }
-.sous-entree { padding: 5px 10px; font-size: 13px; }
-.entree:hover, .sous-entree:hover { background: var(--gris); }
-.entree[aria-current='page'], .sous-entree[aria-current='page'] { background: var(--gris); color: var(--texte); font-weight: 600; }
-.entree[aria-current='page'] svg { color: var(--accent); }
-.titre-rapports { color: var(--texte); font-weight: 600; }
-.titre-rapports:hover { background: none; }
-.rapports { display: flex; flex-direction: column; gap: 1px; padding-left: 8px; margin-bottom: 6px; }
-.numero { width: 22px; height: 22px; flex-shrink: 0; display: grid; place-items: center; font-size: 13px; font-weight: 700; color: var(--doux); }
+.entree { display: flex; align-items: center; gap: 12px; min-height: 36px; padding: 0 10px; border-radius: 8px; font-size: 14px; color: var(--doux); text-decoration: none; }
+.entree svg { flex-shrink: 0; }
+.entree:hover { background: var(--gris); color: var(--texte); }
+.entree[aria-current='page'] { background: var(--gris); color: var(--texte); font-weight: 600; box-shadow: inset 0 0 0 1px var(--bord); }
+.entree[aria-current='page']::after { content: ''; width: 6px; height: 6px; flex-shrink: 0; margin-left: auto; border-radius: 1px; background: var(--accent); }
+.entree:has(.interdit)::after { margin-left: 0; }
+.section-menu { margin: 20px 10px 6px; font-size: 12px; color: var(--doux); }
+.rapports { display: flex; flex-direction: column; gap: 2px; }
+.numero { width: 16px; flex-shrink: 0; text-align: center; font-size: 13px; color: var(--doux); font-variant-numeric: tabular-nums; }
 .interdit { margin-left: auto; font-size: 12px; }
 .espace { flex: 1; min-height: 12px; }
 .utilisateur { display: flex; align-items: center; gap: 10px; padding: 10px; margin-bottom: 8px; border: 1px solid var(--bord); border-radius: 10px; font-size: 13px; }
@@ -427,8 +426,9 @@ button.tuile:hover { filter: brightness(1.06); }
 .retirer { width: 30px; height: 30px; border: 1px solid var(--bord); border-radius: 7px; background: var(--carte); color: var(--doux); display: inline-grid; place-items: center; cursor: pointer; }
 .retirer:hover { background: var(--fond); }
 .barre-envoi { display: flex; align-items: center; gap: 10px; }
-.jauge { flex: 1; display: block; height: 8px; border-radius: 999px; background: var(--fond); overflow: hidden; }
-.jauge > span { display: block; height: 100%; border-radius: 999px; background: var(--accent); }
+/* barre de progression des envois (ne pas nommer .jauge : classe de la jauge d'objectif CA du tableau de bord) */
+.barre-progression { flex: 1; display: block; height: 8px; border-radius: 999px; background: var(--fond); overflow: hidden; }
+.barre-progression > span { display: block; height: 100%; border-radius: 999px; background: var(--accent); }
 .refus-depot { border: 1px solid var(--rouge-bord); background: var(--rouge-teinte); border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
 .refus-depot .titre { font-weight: 600; color: var(--rouge-texte); }
 .refus-depot .ligne { display: flex; align-items: center; gap: 10px; }

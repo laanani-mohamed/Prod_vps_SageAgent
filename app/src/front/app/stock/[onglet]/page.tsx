@@ -73,7 +73,7 @@ export default async function PageStock({ params, searchParams }: { params: Prom
       </Filtres>
       <Kpis items={[
         { nom: 'Nombre de documents', v: entier(r.kpis.nombre) },
-        { nom: `Valeur HT ${onglet === 'entrants' ? 'entrante' : 'sortante'}`, v: `${mad(r.kpis.ht)} DH` },
+        { nom: `Valeur HT ${onglet === 'entrants' ? 'entrante' : 'sortante'}`, v: `${mad(r.kpis.ht)} MAD` },
       ]} />
       <Carte titre={ONGLETS[onglet as keyof typeof ONGLETS]} note={`documents de stock Sage, type ${MOUVEMENTS[onglet]}`}>
         <Tableau
