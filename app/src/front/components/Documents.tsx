@@ -136,9 +136,9 @@ export default async function Documents({ domaine, p, chemin }: { domaine: 0 | 1
           <span>{entier(r.lignes.length)} sur {entier(r.total)} documents</span>
         </div>
         <Tableau
-          colonnes={[{ nom: 'N° pièce', largeur: '116px' }, { nom: 'Date', largeur: '100px' }, { nom: 'Commercial', largeur: '150px' }, { nom: cfg.code, largeur: '130px' },
-            { nom: cfg.tiers }, { nom: 'Montant HT', droite: true, largeur: '116px' }, { nom: 'TVA', droite: true, largeur: '100px' },
-            { nom: 'TTC', droite: true, largeur: '116px' }, { nom: 'Reste à payer', droite: true, largeur: '116px' }]}
+          colonnes={[{ nom: 'N° pièce', largeur: '108px' }, { nom: 'Date', largeur: '96px' }, { nom: 'Commercial', largeur: '140px' }, { nom: cfg.code, largeur: '120px' },
+            { nom: cfg.tiers }, { nom: 'Montant HT', droite: true, largeur: '112px' }, { nom: 'TVA', droite: true, largeur: '96px' },
+            { nom: 'TTC', droite: true, largeur: '112px' }, { nom: 'Reste à payer', droite: true, largeur: '116px' }]}
           lignes={r.lignes.map((l: any) => ({
             cle: l.do_piece, actif: l === choisi, href: lien(chemin, p, { piece_doc: l.do_piece }),
             cellules: [l.do_piece, date(l.date), l.commercial, l.do_tiers, l.ct_intitule, mad(l.do_totalht), mad(l.tva), mad(l.do_totalttc),
