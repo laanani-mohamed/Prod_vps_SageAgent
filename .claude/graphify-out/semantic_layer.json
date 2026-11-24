@@ -1,0 +1,169 @@
+{
+ "_note": "Couche sémantique annotée à la main (relations non visibles par l'AST). Revérifiée le 2026-11-24. Fusionnée par extract_graph.py ; une relation dont une extrémité n'existe plus est écartée et signalée.",
+ "nodes": [
+  {
+   "id": "infra:nginx.sageagent_clients_conf",
+   "label": "nginx/sageagent_clients.conf",
+   "type": "infra_config",
+   "path": "nginx/sageagent_clients.conf"
+  },
+  {
+   "id": "infra:nginx.sageagent_conf",
+   "label": "nginx/sageagent.conf",
+   "type": "infra_config",
+   "path": "nginx/sageagent.conf"
+  },
+  {
+   "id": "infra:systemd.sageagent_dashbi_template",
+   "label": "service/sageagent-dashbi@",
+   "type": "infra_config",
+   "path": "service/sageagent-dashbi@"
+  },
+  {
+   "id": "infra:sudoers.sftp_onboard",
+   "label": "service/sudoers-sftp-onboard",
+   "type": "infra_config",
+   "path": "service/sudoers-sftp-onboard"
+  },
+  {
+   "id": "infra:sftp_onboard_script",
+   "label": "app/utils/client_sftp/sftp_onboard.sh",
+   "type": "script",
+   "path": "app/utils/client_sftp/sftp_onboard.sh"
+  },
+  {
+   "id": "doc:nginx.README",
+   "label": "nginx/README.md",
+   "type": "doc",
+   "path": "nginx/README.md"
+  },
+  {
+   "id": "data:auth_json",
+   "label": "data_Client/reference/auth.json",
+   "type": "data_file",
+   "path": "data_Client/reference/auth.json"
+  },
+  {
+   "id": "script:migrations.add_as_montsto",
+   "label": "app/utils/migrations/add_as_montsto.sql",
+   "type": "script",
+   "path": "app/utils/migrations/add_as_montsto.sql"
+  },
+  {
+   "id": "doc:data_Client.db_struct",
+   "label": "data_Client/reference/db_struct.txt",
+   "type": "doc",
+   "path": "data_Client/reference/db_struct.txt"
+  },
+  {
+   "id": "doc:data_Client.structure_bdd",
+   "label": "data_Client/reference/Structure de la Base de donnee Interne.md",
+   "type": "doc",
+   "path": "data_Client/reference/Structure de la Base de donnee Interne.md"
+  },
+  {
+   "id": "data:logs_message_client",
+   "label": "app/logs/message_client/<CLIENT>/<AAAA-MM-JJ>/ERREUR_*.txt",
+   "type": "data_file",
+   "path": "app/logs/message_client"
+  },
+  {
+   "id": "data:upload_error_reports",
+   "label": "storage_srv/upload/<CLIENT>/ERREUR_*.txt",
+   "type": "data_file",
+   "path": "storage_srv/upload"
+  }
+ ],
+ "edges": [
+  {
+   "source": "mod:app.utils.auth.create_user:create_user",
+   "target": "mod:app.utils.auth.create_user:create_api_user",
+   "type": "CALLS",
+   "confidence": "EXTRACTED"
+  },
+  {
+   "source": "infra:nginx.sageagent_conf",
+   "target": "infra:nginx.sageagent_clients_conf",
+   "type": "USES",
+   "confidence": "EXTRACTED"
+  },
+  {
+   "source": "infra:nginx.sageagent_clients_conf",
+   "target": "infra:systemd.sageagent_dashbi_template",
+   "type": "ROUTES_TO",
+   "confidence": "INFERRED"
+  },
+  {
+   "source": "mod:app.src.dashboard_ops.services.onboarding",
+   "target": "infra:sftp_onboard_script",
+   "type": "EXECUTES",
+   "confidence": "EXTRACTED"
+  },
+  {
+   "source": "infra:sudoers.sftp_onboard",
+   "target": "infra:sftp_onboard_script",
+   "type": "GRANTS_SUDO_FOR",
+   "confidence": "EXTRACTED"
+  },
+  {
+   "source": "doc:nginx.README",
+   "target": "infra:nginx.sageagent_conf",
+   "type": "DOCUMENTS",
+   "confidence": "INFERRED"
+  },
+  {
+   "source": "doc:nginx.README",
+   "target": "infra:nginx.sageagent_clients_conf",
+   "type": "DOCUMENTS",
+   "confidence": "INFERRED"
+  },
+  {
+   "source": "mod:app.src.dashboard_ops.services.onboarding",
+   "target": "data:auth_json",
+   "type": "READS_WRITES",
+   "confidence": "EXTRACTED"
+  },
+  {
+   "source": "script:migrations.add_as_montsto",
+   "target": "mod:app.map_data.reference.columns_order_number",
+   "type": "ALIGNS_WITH",
+   "confidence": "INFERRED"
+  },
+  {
+   "source": "doc:data_Client.db_struct",
+   "target": "mod:app.map_data.reference.columns_order_number",
+   "type": "DOCUMENTS",
+   "confidence": "INFERRED"
+  },
+  {
+   "source": "doc:data_Client.structure_bdd",
+   "target": "mod:app.map_data.reference.columns_order_number",
+   "type": "DOCUMENTS",
+   "confidence": "INFERRED"
+  },
+  {
+   "source": "mod:app.src.etl.reporting.error_report",
+   "target": "data:logs_message_client",
+   "type": "WRITES",
+   "confidence": "EXTRACTED"
+  },
+  {
+   "source": "mod:app.src.etl.reporting.error_report",
+   "target": "data:upload_error_reports",
+   "type": "WRITES",
+   "confidence": "EXTRACTED"
+  },
+  {
+   "source": "mod:app.src.dashboard_ops.services.client_message",
+   "target": "data:logs_message_client",
+   "type": "READS",
+   "confidence": "EXTRACTED"
+  },
+  {
+   "source": "mod:app.src.dashboard_ops.services.client_message",
+   "target": "data:upload_error_reports",
+   "type": "READS",
+   "confidence": "EXTRACTED"
+  }
+ ]
+}
