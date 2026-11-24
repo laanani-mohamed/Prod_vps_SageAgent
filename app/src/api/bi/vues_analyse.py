@@ -479,5 +479,86 @@ def analyse_achats(schema: str, f: dict, co_no: list) -> dict:
             "achats_ventes": achats_ventes}
 
 
-VUES = {"tdb_plus": tdb_plus, "ruptures_a": ruptures_a, "analyse_ventes": analyse_ventes, "analyse_achats": analyse_achats}
-RESERVEES_DIRECTEUR = {"ruptures_a", "analyse_achats"}
+# ---------------------------------------------------------------------------
+# Stock : alerte « Ruptures sur les meilleures ventes » (directeur)
+# ---------------------------------------------------------------------------
+def ruptures_ventes(schema: str, f: dict, co_no: list) -> dict:
+    """Articles qui font 80 % du CA HT de la période (lignes de factures 6 et 7), sans stock (tous dépôts, ≤ 0), hors sommeil ;
+    classés par CA, avec le dernier fournisseur (dernière facture d'achat 16 ou 17). Filtre `famille`, pages de 10."""
+    du, au = _periode(f)
+    s = validate_schema(schema)
+
+    def calcul():
+        df = _sql(f"""WITH ventes AS (
+                          SELECT l.ar_ref, SUM(l.dl_montantht) AS ca, SUM(l.dl_qte) AS qte, MAX(e.do_date::date) AS derniere_vente
+                          FROM {s}.f_docligne l
+                          JOIN {s}.f_docentete e ON e.do_domaine = l.do_domaine AND e.do_type = l.do_type AND e.do_piece = l.do_piece
+                          WHERE e.do_domaine = 0 AND e.do_type IN (6, 7) AND l.ar_ref IS NOT NULL AND e.do_date::date BETWEEN %s AND %s
+                          GROUP BY l.ar_ref HAVING SUM(l.dl_montantht) > 0),
+                        achat AS (
+                          SELECT DISTINCT ON (l.ar_ref) l.ar_ref, e.do_tiers, e.do_date::date AS dernier_achat
+                          FROM {s}.f_docligne l
+                          JOIN {s}.f_docentete e ON e.do_domaine = l.do_domaine AND e.do_type = l.do_type AND e.do_piece = l.do_piece
+                          WHERE e.do_domaine = 1 AND e.do_type IN (16, 17) AND l.ar_ref IS NOT NULL AND l.dl_qte > 0
+                          ORDER BY l.ar_ref, e.do_date DESC)
+                      SELECT v.ar_ref, a.ar_design, COALESCE(a.fa_codefamille, '') AS fa_codefamille, COALESCE(a.ar_sommeil, 0) AS sommeil,
+                             v.ca, v.qte, v.derniere_vente,
+                             COALESCE((SELECT SUM(st.as_qtesto) FROM {s}.f_artstock st WHERE st.ar_ref = v.ar_ref), 0) AS stock,
+                             COALESCE(NULLIF(TRIM(c.ct_intitule), ''), ac.do_tiers) AS fournisseur, ac.dernier_achat
+                      FROM ventes v LEFT JOIN {s}.f_article a ON a.ar_ref = v.ar_ref
+                      LEFT JOIN achat ac ON ac.ar_ref = v.ar_ref LEFT JOIN {s}.f_comptet c ON c.ct_num = ac.do_tiers""", [du, au])
+        df = _num(df, "ca", "qte", "stock").sort_values("ca", ascending=False).reset_index(drop=True)
+        total = float(df["ca"].sum())
+        avant = df["ca"].cumsum().shift(fill_value=0.0) / total * 100 if total else df["ca"] * 0
+        classe_a = df[avant < PART_CLASSE_A].assign(rang=lambda x: x.index + 1)      # inclut l'article qui franchit les 80 %
+        rupt = classe_a[(classe_a["stock"] <= 0) & (classe_a["sommeil"] != 1)].copy()
+        rupt["fournisseur"] = rupt["fournisseur"].fillna("Inconnu")
+        return {"ca_total": total, "classe_a": int(len(classe_a)), "ruptures": rupt}
+
+    c = memo(schema, f"analyse|ruptures_ventes|{du}|{au}", calcul)
+    r = c["ruptures"]
+    if f.get("famille"):
+        r = r[r["fa_codefamille"] == f["famille"]]
+    four = r.groupby("fournisseur").agg(ca=("ca", "sum"), nombre=("ar_ref", "size")).sort_values("ca", ascending=False)
+    fam = r["fa_codefamille"].value_counts().head(10)
+    jours = (date.fromisoformat(au) - date.fromisoformat(du)).days + 1
+    page, taille = max(1, int(f.get("page") or 1)), 10
+    morceau = r.iloc[(page - 1) * taille: page * taille]
+    return {"du": du, "au": au, "jours": jours, "ca_total": _r(c["ca_total"]), "classe_a": c["classe_a"],
+            "total": int(len(r)), "ca_ruptures": _r(r["ca"].sum()), "ca_max": _r(r["ca"].max()) if len(r) else 0.0, "fournisseurs": int(len(four)),
+            "par_fournisseur": [{"nom": k, "ca": _r(v.ca), "nombre": int(v.nombre)} for k, v in four.head(10).iterrows()],
+            "par_famille": [{"famille": k, "nombre": int(v)} for k, v in fam.items()],
+            "page": page, "taille_page": taille,
+            "lignes": [{"rang": int(x.rang), "ar_ref": x.ar_ref, "ar_design": x.ar_design, "fa_codefamille": x.fa_codefamille, "ca": _r(x.ca),
+                        "qte": _r(x.qte), "derniere_vente": str(x.derniere_vente)[:10] if x.derniere_vente else None, "stock": _r(x.stock),
+                        "fournisseur": x.fournisseur, "dernier_achat": str(x.dernier_achat)[:10] if x.dernier_achat else None}
+                       for x in morceau.itertuples()]}
+
+
+# ---------------------------------------------------------------------------
+# Règlements : recouvrement des factures de la période
+# ---------------------------------------------------------------------------
+def recouvrement(schema: str, f: dict, co_no: list) -> dict:
+    """Factures de la période (ventes 6/7, achats 16/17) : TTC et reste dû TTC = TTC − réglé, avoirs déduits (même chiffre
+    que la page Ventes) ; ancienneté (jours depuis la date de facture : Sage n'exporte pas les échéances) et état des
+    factures positives dont le reste dépasse SEUIL_IMPAYE."""
+    du, au = _periode(f)
+    domaine = int(f.get("domaine", 0))
+    fac = _entetes(schema, domaine, [6, 7] if domaine == 0 else [16, 17], co_no)
+    p = fac[(fac["d"] >= pd.Timestamp(du)) & (fac["d"] <= pd.Timestamp(au))]
+    pos = p[p["ht"] > 0].assign(reste=lambda x: (x["ttc"] - x["regle"]).clip(lower=0))
+    imp = pos[pos["reste"] > SEUIL_IMPAYE]
+    age = (pd.Timestamp(au) - imp["d"]).dt.days
+    tranches = [("0 à 30 j", age <= 30), ("31 à 60 j", (age > 30) & (age <= 60)), ("61 à 90 j", (age > 60) & (age <= 90)), ("plus de 90 j", age > 90)]
+    soldees, partielles, non = pos[pos["reste"] <= SEUIL_IMPAYE], imp[imp["regle"] > SEUIL_IMPAYE], imp[imp["regle"] <= SEUIL_IMPAYE]
+    avoirs = p[p["ht"] < 0]
+    return {"du": du, "au": au, "factures": int(len(pos)), "ttc": _r(p["ttc"].sum()), "regle": _r(pos["regle"].sum()),
+            "reste": _r((p["ttc"] - p["regle"]).sum()), "reste_factures": _r(imp["reste"].sum()), "avoirs": _r(-(avoirs["ttc"] - avoirs["regle"]).sum()),
+            "tranches": [{"nom": n, "montant": _r(imp.loc[m, "reste"].sum()), "nombre": int(m.sum())} for n, m in tranches],
+            "etat": [{"nom": "Réglées", "nombre": int(len(soldees)), "montant": _r(soldees["ttc"].sum())},
+                     {"nom": "Partiellement réglées", "nombre": int(len(partielles)), "montant": _r(partielles["reste"].sum())},
+                     {"nom": "Non réglées", "nombre": int(len(non)), "montant": _r(non["reste"].sum())}]}
+
+
+VUES = {"tdb_plus": tdb_plus, "ruptures_a": ruptures_a, "ruptures_ventes": ruptures_ventes, "recouvrement": recouvrement, "analyse_ventes": analyse_ventes, "analyse_achats": analyse_achats}
+RESERVEES_DIRECTEUR = {"ruptures_a", "ruptures_ventes", "analyse_achats"}

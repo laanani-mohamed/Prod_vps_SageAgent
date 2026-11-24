@@ -364,7 +364,7 @@ def stock_etat(schema: str, f: dict, co_no: list) -> dict:
 
 
 def stock_alertes(schema: str, f: dict, co_no: list) -> dict:
-    """Les 4 alertes de stock (nombre de lignes de chacune), puis l'alerte choisie : 5 premières familles et lignes."""
+    """Les 4 alertes de stock (nombre de lignes de chacune), puis l'alerte choisie : 10 premières familles et lignes."""
     mois, jours = int(f.get("mois") or 6), int(f.get("jours") or 60)
     choisi = f.get("type") or "rupture"
     if choisi not in ALERTES:
@@ -383,7 +383,7 @@ def stock_alertes(schema: str, f: dict, co_no: list) -> dict:
     if "valeur_stock" in df.columns:
         df = _num(df, "valeur_stock").sort_values("valeur_stock", ascending=False)
     colonnes = [c for c in df.columns if c not in ("ar_suivistock", "suivi_lot")]
-    par_famille = df["fa_codefamille"].value_counts().head(5) if not df.empty else pd.Series(dtype=int)
+    par_famille = df["fa_codefamille"].value_counts().head(10) if not df.empty else pd.Series(dtype=int)
     return {
         "types": [{"type": t, "nombre": len(d)} for t, d in donnees.items()], "type": choisi, "mois": mois, "jours": jours,
         "par_famille": [{"famille": k, "nombre": int(v)} for k, v in par_famille.items()],
@@ -435,5 +435,5 @@ VUES = {
 def reservee_directeur(nom: str, f: dict) -> bool:
     """Vue sans commercial (stock, achats, fournisseurs) : refusée à un collaborateur."""
     return (nom in {"depots", "stock_etat", "stock_alertes", "plan_depots"} | vues_analyse.RESERVEES_DIRECTEUR
-            or (nom in {"documents", "document", "reglements"} and int(f.get("domaine", 0)) != 0)
+            or (nom in {"documents", "document", "reglements", "recouvrement"} and int(f.get("domaine", 0)) != 0)
             or (nom == "tiers" and int(f.get("ct_type", 0)) != 0))

@@ -5,15 +5,15 @@ import Link from 'next/link'
 import { Attente } from '../../../components/Interactions'
 import { Barres, Carte, Champ, Entete, Filtres, Interdit, Kpis, Pagination, Tableau } from '../../../components/ui'
 import { api, estCollaborateur, session, vue } from '../../../lib/api'
-import { cellule, court, date, entier, mad } from '../../../lib/format'
+import { cellule, court, date, entier, mad, pct } from '../../../lib/format'
 import { anneeEnCours, lien, lire, type Params } from '../../../lib/params'
 
 const ONGLETS = { etat: 'État des stocks', entrants: 'Mouvements entrants', sortants: 'Mouvements sortants', alertes: 'Alertes & insights' }
 // Même correspondance que la page Streamlit actuelle (alors que Sage nomme 20 « entrée » et 21 « sortie »)
 const MOUVEMENTS: Record<string, number> = { entrants: 21, sortants: 20 }
-const ALERTES: Record<string, string> = { rupture: 'Rupture de stock', dormant: 'Produits dormants', jamais_vendu: 'Jamais vendus', peremption: 'Lots en péremption' }
-const AIDE_ALERTE: Record<string, string> = { rupture: 'article × dépôt à quantité nulle', dormant: 'sans vente depuis N mois', jamais_vendu: 'en stock, aucune vente', peremption: 'lots qui périment bientôt' }
-const COULEUR_ALERTE: Record<string, string> = { rupture: '#dc2626', dormant: '#d97706', jamais_vendu: '#71717a', peremption: '#7c3aed' }
+const ALERTES: Record<string, string> = { rupture: 'Rupture de stock', rupture_a: 'Ruptures sur les meilleures ventes', dormant: 'Produits dormants', jamais_vendu: 'Jamais vendus', peremption: 'Lots en péremption' }
+const AIDE_ALERTE: Record<string, string> = { rupture: 'article × dépôt à quantité nulle', rupture_a: 'articles des 80 % du CA, sans stock', dormant: 'sans vente depuis N mois', jamais_vendu: 'en stock, aucune vente', peremption: 'lots qui périment bientôt' }
+const COULEUR_ALERTE: Record<string, string> = { rupture: '#dc2626', rupture_a: '#9f1239', dormant: '#d97706', jamais_vendu: '#71717a', peremption: '#7c3aed' }
 const LIBELLES: Record<string, string> = {
   ar_ref: 'Réf. article', ar_design: 'Désignation', fa_codefamille: 'Famille', de_intitule: 'Dépôt', quantite_totale: 'Quantité',
   derniere_date_vente: 'Dernière vente', nbr_jours_inactif: "Jours d'inactivité", prix_achat: 'Prix achat', valeur_stock: 'Valeur stock',
@@ -100,40 +100,47 @@ export default async function PageStock({ params, searchParams }: { params: Prom
     </>
   } else {
     const type = lire(p, 'type') || 'rupture'
-    const [r, familles] = await Promise.all([
-      vue('stock_alertes', { type, mois: lire(p, 'mois') || 6, jours: lire(p, 'jours') || 60, famille: lire(p, 'famille'), page }),
+    const defaut = anneeEnCours()   // meilleures ventes : CA du 01/01 à aujourd'hui, comme le Tableau de Bord
+    const du = lire(p, 'du') || defaut.debut, au = lire(p, 'au') || defaut.fin
+    const estRv = type === 'rupture_a'
+    const [r, rv, familles] = await Promise.all([
+      vue('stock_alertes', { type: estRv ? 'rupture' : type, mois: lire(p, 'mois') || 6, jours: lire(p, 'jours') || 60, famille: lire(p, 'famille'), page: estRv ? 1 : page }),
+      vue('ruptures_ventes', { date_from: du, date_to: au, famille: lire(p, 'famille'), page: estRv ? page : 1 }),
       api('/api/referentiel/familles', { client_schema: s.client }),
     ])
+    const types = [...r.types.slice(0, 1), { type: 'rupture_a', nombre: rv?.total ?? 0 }, ...r.types.slice(1)]
+    const courant = estRv ? 'rupture_a' : r.type
     const nomFamille = Object.fromEntries((familles?.data ?? []).map((f: any) => [f.fa_codefamille, f.fa_intitule]))
     const colonnes = r.colonnes.filter((c: string) => c !== 'prix_achat') // tableau sur 2/3 de la largeur
     const format = (c: string, v: unknown) => (c.includes('date') || c === 'ls_peremption' ? date(v as string) : cellule(v))
     contenu = <>
       <nav className="types-alertes" aria-label="Type d'alerte">
-        {r.types.map((t: any) => (
-          <Link prefetch={false} key={t.type} href={lien(chemin, {}, { type: t.type })} className="type-alerte" aria-current={t.type === r.type ? 'page' : undefined}>
+        {types.map((t: any) => (
+          <Link prefetch={false} key={t.type} href={lien(chemin, {}, { type: t.type })} className="type-alerte" aria-current={t.type === courant ? 'page' : undefined}>
             <span className="nom"><i style={{ background: COULEUR_ALERTE[t.type] }} />{ALERTES[t.type]}</span>
             <strong>{entier(t.nombre)}</strong>
             <span className="doux petit">{AIDE_ALERTE[t.type]}<Attente /></span>
           </Link>
         ))}
       </nav>
-      <Filtres colonnes="minmax(0, 260px) minmax(0, 220px) 1fr max-content">
+      <Filtres colonnes={estRv ? 'minmax(0, 260px) minmax(0, 200px) minmax(0, 200px) 1fr max-content' : 'minmax(0, 260px) minmax(0, 220px) 1fr max-content'}>
         <input type="hidden" name="type" value={type} />
         <Champ label="Famille" name="famille" defaut={lire(p, 'famille')}
           options={[['', 'Toutes les familles'], ...(familles?.data ?? []).map((f: any): [string, string] => [f.fa_codefamille, `${f.fa_codefamille} · ${f.fa_intitule ?? ''}`])]} />
         {type === 'dormant' && <Champ label="Mois d'inactivité" name="mois" type="number" defaut={String(r.mois)} />}
         {type === 'peremption' && <Champ label="Jours avant péremption" name="jours" type="number" defaut={String(r.jours)} />}
-        {type !== 'dormant' && type !== 'peremption' && <span />}
+        {estRv && <><Champ label="Du" name="du" type="date" defaut={du} /><Champ label="Au" name="au" type="date" defaut={au} /></>}
+        {type !== 'dormant' && type !== 'peremption' && !estRv && <span />}
         <span />
       </Filtres>
-      {r.total === 0 ? (
+      {estRv ? <RupturesVentes rv={rv} nomFamille={nomFamille} pagination={(n) => lien(chemin, p, { page: n })} /> : r.total === 0 ? (
         <Carte titre={ALERTES[r.type]}>
           <p className="vide">{r.type === 'peremption'
             ? `Aucun lot ne périme dans les ${r.jours} prochains jours. La table des lots (F_LOTSERIE) est presque vide : le suivi par lot n'est pas utilisé dans Sage.`
             : 'Aucun produit concerné.'}</p>
         </Carte>
       ) : <div className="grille-3">
-        <Carte titre="Produits concernés par famille" note="5 premières familles">
+        <Carte titre="Produits concernés par famille" note="10 premières familles">
           <Barres items={r.par_famille.map((x: any) => ({ nom: `${x.famille} · ${nomFamille[x.famille] ?? ''}`, v: x.nombre, libelle: entier(x.nombre) }))} />
         </Carte>
         <Carte span={2} titre={ALERTES[r.type]} note={`${entier(r.total)} lignes`}>
@@ -148,4 +155,61 @@ export default async function PageStock({ params, searchParams }: { params: Prom
   }
 
   return <Page accent={ACCENT}>{entete}{onglets}{contenu}</Page>
+}
+
+/** Alerte « Ruptures sur les meilleures ventes » (vue ruptures_ventes) : articles qui font 80 % du CA HT de la période, sans stock. */
+function RupturesVentes({ rv, nomFamille, pagination }: { rv: any; nomFamille: Record<string, string>; pagination: (n: number) => string }) {
+  if (!rv) return <p className="vide">Alerte indisponible.</p>
+  if (!rv.total) return <Carte titre={ALERTES.rupture_a}><p className="vide">Aucune des meilleures ventes n&apos;est en rupture.</p></Carte>
+  const periode = `du ${date(rv.du)} au ${date(rv.au)}`, an = rv.au.slice(0, 4)
+  const maxCa = Math.max(rv.ca_max, 1)   // échelle commune à toutes les pages : le plus gros CA en rupture
+  return <>
+    <Kpis items={[
+      { nom: 'Meilleures ventes en rupture', v: <AvecCercle valeur={entier(rv.total)} part={(rv.total / rv.classe_a) * 100} classe="mauvais" />, ton: 'mauvais',
+        sous: `sur ${entier(rv.classe_a)} articles qui font 80 % du CA` },
+      { nom: `CA ${an} concerné`, v: <AvecCercle valeur={court(rv.ca_ruptures)} part={rv.ca_total ? (rv.ca_ruptures / rv.ca_total) * 100 : 0} />, sous: `du CA HT ${periode}` },
+      { nom: 'Ventes à risque par mois', v: court((rv.ca_ruptures / rv.jours) * 365.25 / 12), sous: `CA moyen par mois depuis le ${date(rv.du)}, tant que la rupture dure` },
+      { nom: 'Fournisseurs à relancer', v: entier(rv.fournisseurs), sous: 'dernier fournisseur de chaque article' },
+    ]} />
+    <div className="grille">
+      <Carte titre="Ruptures par fournisseur" note={`10 premiers · CA ${an} des articles en rupture`}>
+        <Barres items={rv.par_fournisseur.map((x: any) => ({ nom: x.nom, v: x.ca, libelle: `${court(x.ca)} · ${entier(x.nombre)} art.` }))} />
+      </Carte>
+      <Carte titre="Produits concernés par famille" note="10 premières familles">
+        <Barres items={rv.par_famille.map((x: any) => ({ nom: `${x.famille} · ${nomFamille[x.famille] ?? ''}`, v: x.nombre, libelle: entier(x.nombre) }))} />
+      </Carte>
+    </div>
+    <Carte titre={ALERTES.rupture_a} note={`${entier(rv.total)} articles · classés par CA HT ${periode}`}>
+      <p className="doux petit">Rang = place de l&apos;article dans le classement des ventes de la période (1 = plus gros CA). Le dernier fournisseur est celui de la dernière facture d&apos;achat.</p>
+      <Tableau
+        colonnes={[{ nom: 'Rang', largeur: '64px' }, { nom: 'Réf. article', largeur: '130px' }, { nom: 'Désignation' }, { nom: `CA ${an}`, droite: true, largeur: '180px' },
+          { nom: 'Qté vendue', droite: true, largeur: '96px' }, { nom: 'Dernière vente', largeur: '110px' }, { nom: 'Stock', droite: true, largeur: '70px' }, { nom: 'Dernier fournisseur', largeur: '230px' }]}
+        lignes={rv.lignes.map((l: any) => ({
+          cle: l.ar_ref,
+          cellules: [<span key="r" className="doux fort">#{l.rang}</span>, <strong key="a">{l.ar_ref}</strong>, l.ar_design,
+            <span key="c" className="part"><span className="piste"><span style={{ width: `${Math.max(2, (l.ca / maxCa) * 100)}%` }} /></span>{court(l.ca)}</span>,
+            entier(l.qte), date(l.derniere_vente), <strong key="s" className="mauvais">{entier(l.stock)}</strong>,
+            `${l.fournisseur}${l.dernier_achat ? ` · ${date(l.dernier_achat)}` : ''}`],
+        }))}
+      />
+      <Pagination total={rv.total} page={rv.page} taille={rv.taille_page} href={pagination} />
+    </Carte>
+  </>
+}
+
+/** Valeur d'un KPI avec, à droite, un cercle de pourcentage (part du total). */
+function AvecCercle({ valeur, part, classe }: { valeur: string; part: number; classe?: string }) {
+  const p = Math.min(100, Math.max(0, part))
+  return (
+    <span className="kpi-cercle">
+      <span>{valeur}</span>
+      <span className={['cercle-kpi', classe].filter(Boolean).join(' ')} role="img" aria-label={`${pct(part)} du total`}>
+        <svg viewBox="0 0 64 64" aria-hidden="true">
+          <circle cx="32" cy="32" r="26" className="piste-anneau" />
+          <circle cx="32" cy="32" r="26" pathLength={100} className="valeur-anneau" strokeDasharray={`${p} 100`} transform="rotate(-90 32 32)" />
+        </svg>
+        <span>{pct(part)}</span>
+      </span>
+    </span>
+  )
 }
