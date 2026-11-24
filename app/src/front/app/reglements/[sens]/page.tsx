@@ -3,7 +3,7 @@ import Page from '../../../components/Page'
 import { Barres, Carte, Champ, Entete, Filtres, Interdit, Onglets, Pagination, Tableau } from '../../../components/ui'
 import { estCollaborateur, session, vue } from '../../../lib/api'
 import { court, date, entier, mad, pct } from '../../../lib/format'
-import { anneeEnCours, lien, lire, type Params } from '../../../lib/params'
+import { lien, lire, type Params } from '../../../lib/params'
 
 const SENS = {
   encaissements: { domaine: 0, onglet: 'Encaissements clients (ventes)', code: 'Code client', tiers: 'Clients concernés', titre: 'Historique des encaissements' },
@@ -26,13 +26,14 @@ export default async function PageReglements({ params, searchParams }: { params:
   const entete = <Entete titre="Règlements & Flux Financiers" sousTitre="Encaissements clients et décaissements fournisseurs (Sage F_REGLECH)" />
   if (collab && cfg.domaine === 1) return <Page accent="#00b4d8">{entete}{onglets}<Interdit /></Page>
 
-  const defaut = anneeEnCours()   // période par défaut : du 01/01 à aujourd'hui, comme le Tableau de Bord (affichée dans les filtres)
-  const du = lire(p, 'du') || defaut.debut, au = lire(p, 'au') || defaut.fin
+  // Période par défaut : de la plus ancienne à la plus récente facture (bornes renvoyées par la vue recouvrement, affichées dans les filtres)
+  const rec = await vue('recouvrement', { domaine: cfg.domaine, date_from: lire(p, 'du') || undefined, date_to: lire(p, 'au') || undefined })
+  const du = lire(p, 'du') || rec?.du, au = lire(p, 'au') || rec?.au
   const filtres = {
     domaine: cfg.domaine, piece: lire(p, 'piece'), tiers: lire(p, 'tiers'), intitule: lire(p, 'intitule'),
     date_from: du, date_to: au, page: lire(p, 'page') || 1, taille: 10,
   }
-  const [r, rec] = await Promise.all([vue('reglements', filtres), vue('recouvrement', { domaine: cfg.domaine, date_from: du, date_to: au })])
+  const r = await vue('reglements', filtres)
   // Règlement choisi (par défaut le plus récent) et document associé
   const choisi = r.lignes.find((l: any) => String(l.rg_no) === lire(p, 'rg') && l.do_piece === lire(p, 'piece_doc')) ?? r.lignes[0]
   const doc = choisi && (await vue('document', { domaine: choisi.do_domaine, type: choisi.do_type, piece: choisi.do_piece }))

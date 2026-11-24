@@ -542,9 +542,11 @@ def recouvrement(schema: str, f: dict, co_no: list) -> dict:
     """Factures de la période (ventes 6/7, achats 16/17) : TTC et reste dû TTC = TTC − réglé, avoirs déduits (même chiffre
     que la page Ventes) ; ancienneté (jours depuis la date de facture : Sage n'exporte pas les échéances) et état des
     factures positives dont le reste dépasse SEUIL_IMPAYE."""
-    du, au = _periode(f)
     domaine = int(f.get("domaine", 0))
     fac = _entetes(schema, domaine, [6, 7] if domaine == 0 else [16, 17], co_no)
+    # dates absentes : de la plus ancienne à la plus récente facture (tout l'historique)
+    bornes = (fac["d"].min(), fac["d"].max()) if not fac.empty else (pd.Timestamp(date.today()),) * 2
+    du, au = _periode({"date_from": f.get("date_from") or str(bornes[0].date()), "date_to": f.get("date_to") or str(bornes[1].date())})
     p = fac[(fac["d"] >= pd.Timestamp(du)) & (fac["d"] <= pd.Timestamp(au))]
     pos = p[p["ht"] > 0].assign(reste=lambda x: (x["ttc"] - x["regle"]).clip(lower=0))
     imp = pos[pos["reste"] > SEUIL_IMPAYE]
